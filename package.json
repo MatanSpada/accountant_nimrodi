@@ -1,0 +1,33 @@
+{
+  "name": "accountant-nimrodi-payments",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phase 1 foundation for Nimrodi & Co CPA payment link admin system on Cloudflare Workers.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --dry-run",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "cf-typegen": "wrangler types",
+    "db:migrate:local": "wrangler d1 migrations apply nimrodi_payments --local",
+    "db:execute:local": "wrangler d1 execute nimrodi_payments --local --file"
+  },
+  "dependencies": {
+    "hono": "^4.12.28"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250408.0",
+    "@eslint/js": "^9.31.0",
+    "eslint": "^9.31.0",
+    "globals": "^16.3.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.37.0",
+    "vitest": "^1.6.1",
+    "wrangler": "^3.114.17"
+  }
+}

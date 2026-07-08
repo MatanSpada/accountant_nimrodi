@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "accountant-nimrodi-payments",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "APP_ENV": "development",
+    "DEFAULT_PAYMENT_PROVIDER": "mock-grow"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nimrodi_payments",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "preview_database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ]
+}
