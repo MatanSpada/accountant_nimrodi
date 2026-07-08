@@ -8,6 +8,8 @@ import { MockPaymentProvider } from "../infrastructure/grow/mock-payment-provide
 import { PaymentService } from "../domain/payments/payment-service";
 import { D1PaymentRepository } from "../infrastructure/db/d1-payment-repository";
 import { D1CustomerRepository } from "../infrastructure/db/d1-customer-repository";
+import { PaymentWebhookService } from "../domain/payments/payment-webhook-service";
+import { parseMockGrowWebhookPayload } from "../infrastructure/grow/mock-grow-webhook-parser";
 
 export function createContainer(
   env?: Env,
@@ -40,6 +42,10 @@ export function createContainer(
       paymentRepository,
       customerRepository,
       paymentProvider
+    }),
+    paymentWebhookService: new PaymentWebhookService({
+      paymentRepository,
+      parseMockGrowWebhookPayload
     })
   };
 }

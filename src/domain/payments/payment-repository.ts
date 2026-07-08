@@ -55,6 +55,7 @@ export interface PaymentListResult {
 export interface PaymentRepository {
   create(input: CreatePaymentRecordInput): Promise<Payment>;
   findById(id: string): Promise<Payment | null>;
+  findByProviderPaymentId(providerPaymentId: string): Promise<Payment | null>;
   findByProviderTransactionId(
     providerTransactionId: string
   ): Promise<Payment | null>;
@@ -67,6 +68,14 @@ export interface PaymentRepository {
   createWebhookRecord(
     input: CreatePaymentWebhookInput
   ): Promise<PaymentWebhookRecord>;
+  findWebhookByProviderEventId(
+    provider: string,
+    providerEventId: string
+  ): Promise<PaymentWebhookRecord | null>;
+  listWebhooksByPaymentId(
+    paymentId: string,
+    limit?: number
+  ): Promise<PaymentWebhookRecord[]>;
   markWebhookProcessed(
     webhookId: string,
     processedAt: string

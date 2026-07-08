@@ -41,6 +41,9 @@ describe("InMemoryPaymentRepository", () => {
 
     expect(withProvider?.status).toBe("payment_created");
     expect(await repository.findById(created.id)).toEqual(withProvider);
+    expect(await repository.findByProviderPaymentId("mockpay_1")).toEqual(
+      withProvider
+    );
     expect(await repository.findByProviderTransactionId("mocktxn_1")).toEqual(
       withProvider
     );
@@ -136,6 +139,10 @@ describe("InMemoryPaymentRepository", () => {
 
     expect(webhook.rawPayload).toBe('{"ok":true}');
     expect(webhook.processingStatus).toBe("received");
+    expect(
+      await repository.findWebhookByProviderEventId("mock-grow", "evt_001")
+    ).toEqual(webhook);
+    expect(await repository.listWebhooksByPaymentId("missing")).toEqual([]);
 
     const processed = await repository.markWebhookProcessed(
       webhook.id,

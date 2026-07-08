@@ -13,6 +13,7 @@
 - Confirmation that webhooks are enabled
 - Confirmation whether payment page can be bank-transfer-only
 - Confirmation whether GROW issues receipts for bank-transfer payments
+- Real GROW webhook payload examples from sandbox and/or production
 - CRM access/API details if we integrate with an existing CRM
 - Invoice provider API details if receipts are issued outside GROW
 - Domain/subdomain decision, for example `payments.nimrodi.co.il` or a temporary Cloudflare URL

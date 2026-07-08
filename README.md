@@ -1,6 +1,6 @@
 # מערכת תשלומים פנימית — נמרודי ושות׳
 
-Phase 3 of an internal payment-request system for "נמרודי ושות׳ – רואי חשבון".
+Phase 4 of an internal payment-request system for "נמרודי ושות׳ – רואי חשבון".
 
 The long-term business flow is:
 
@@ -10,7 +10,7 @@ The long-term business flow is:
 4. Webhooks later update the payment status.
 5. Receipt / invoice logic is added in a later phase.
 
-This phase still does **not** connect to real GROW. It adds the internal admin payment flow on top of the mock provider and the D1-backed persistence layer.
+This phase still does **not** connect to real GROW. It adds a mock webhook processing flow on top of the existing internal admin flow and the D1-backed persistence layer.
 
 ## Current phase status
 
@@ -23,10 +23,12 @@ This phase still does **not** connect to real GROW. It adds the internal admin p
   - payment details page
   - client requirements page
 - A user can create a mock payment link from the admin UI, copy it, and open a manual WhatsApp link.
+- A user can simulate `paid`, `failed`, `cancelled`, and `expired` webhook outcomes from the admin UI or the mock payment page.
 - Payment list and payment details pages read from the repository layer.
+- Incoming mock webhook payloads are stored raw in `payment_webhooks`, validated against the payment, and processed idempotently by `event_id`.
 - No authentication yet.
 - No real GROW integration yet.
-- No production webhook processing flow yet.
+- `/api/grow/webhook` is intentionally reserved and returns `501 Not Implemented` until verified real GROW payloads are available.
 - No real invoice provider integration yet.
 
 ## Tech stack
@@ -71,6 +73,20 @@ Final payment statuses:
 - `received`
 - `processed`
 - `failed`
+
+## Mock webhook flow in phase 4
+
+1. Create a payment from `/admin/payments/new`
+2. Open the payment details page or the mock payment URL
+3. Trigger one of the development simulator buttons
+4. The UI sends a JSON payload to `POST /api/mock-grow/webhook`
+5. The backend:
+   - stores the raw payload in `payment_webhooks`
+   - finds the matching payment by provider identifiers
+   - validates amount, currency, and allowed status transition
+   - updates the payment if valid
+   - marks the webhook as `processed` or `failed`
+6. If the same `event_id` is sent again, the webhook is treated as a duplicate and is not processed twice
 
 ## Database schema overview
 
@@ -123,6 +139,8 @@ http://127.0.0.1:8787
 - Dashboard: `http://127.0.0.1:8787/`
 - New payment: `http://127.0.0.1:8787/admin/payments/new`
 - Payments list: `http://127.0.0.1:8787/admin/payments`
+- Payment details: `http://127.0.0.1:8787/admin/payments/<PAYMENT_ID>`
+- Mock payment page: `http://127.0.0.1:8787/dev/mock-grow/pay/<PROVIDER_PAYMENT_ID>`
 - Client requirements: `http://127.0.0.1:8787/admin/settings/client-requirements`
 
 ## Internal API examples
@@ -153,6 +171,32 @@ Get one payment:
 curl http://127.0.0.1:8787/api/payments/<PAYMENT_ID>
 ```
 
+Simulate a paid webhook in development:
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/mock-grow/webhook \
+  -H "content-type: application/json" \
+  -d '{
+    "event_id": "mock_evt_example_paid",
+    "event_type": "payment.paid",
+    "provider": "mock_grow",
+    "provider_payment_id": "<PROVIDER_PAYMENT_ID>",
+    "provider_transaction_id": "<PROVIDER_TRANSACTION_ID>",
+    "status": "paid",
+    "amount_agorot": 125000,
+    "currency": "ILS",
+    "occurred_at": "2026-07-09T10:00:00.000Z"
+  }'
+```
+
+Reserved real webhook endpoint:
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/grow/webhook \
+  -H "content-type: application/json" \
+  -d '{}'
+```
+
 Health check:
 
 ```bash
@@ -175,8 +219,12 @@ curl http://127.0.0.1:8787/health
    - provider payment id
    - copy link button
    - WhatsApp link button
-8. Open `/admin/payments`
-9. Confirm the created payment appears in the list
+8. Click `סימולציה: שולם`
+9. Confirm the status changes to `שולם`
+10. Confirm a webhook record appears in the payment details page
+11. POST the same `event_id` again to `/api/mock-grow/webhook` and confirm the response is duplicate-safe
+12. Open `/admin/payments`
+13. Confirm the created payment appears in the list with the updated status
 
 ## Tests
 
@@ -218,12 +266,42 @@ Notes:
 - Local D1 testing in this phase is verified through:
   - `npm run db:migrate:local`
   - `npm run dev -- --port 8787`
-  - `GET /health`
-  - loading `/`
-  - loading `/admin/payments/new`
-  - creating a payment through the UI/API
-  - loading `/admin/payments`
-  - loading `/admin/payments/:id`
+
+## What is intentionally mocked
+
+- Payment-provider request creation
+- Payment-provider webhook payload schema
+- Payment-provider hosted payment page
+- WhatsApp sending itself
+- Invoice creation
+- CRM integration
+
+The local mock webhook schema is a development simulator only. It is **not** a verified GROW schema and must not be treated as production truth.
+
+## Why `/api/grow/webhook` is not active yet
+
+- Real GROW sandbox or production payload examples have not been provided by the client.
+- The parser must be implemented only after verifying the real fields, signature behavior, and status semantics from the client-owned GROW account.
+
+## Verified commands
+
+```bash
+npm install
+npm run format
+npm run lint
+npm run typecheck
+npm run test
+npm run cf-typegen
+npm run db:migrate:local
+npm run dev -- --port 8787
+```
+
+- `GET /health`
+- loading `/`
+- loading `/admin/payments/new`
+- creating a payment through the UI/API
+- loading `/admin/payments`
+- loading `/admin/payments/:id`
 - `compatibility_date` is pinned to `2025-07-18` because the verified local toolchain in this workspace is `Node 18.19.1` with `wrangler 3.114.17`.
 - When the project moves to `Node 22+` and `wrangler 4`, update the compatibility date to the current day before production rollout.
 

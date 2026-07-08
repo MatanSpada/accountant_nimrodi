@@ -27,12 +27,13 @@ export class MockPaymentProvider implements PaymentProvider {
     input: CreatePaymentDraftInput & { internalPaymentId: string }
   ): Promise<ProviderPaymentRequest> {
     const suffix = createDeterministicSuffix(input);
+    const providerPaymentId = `mockpay_${suffix}`;
 
     return {
       provider: this.providerKey,
-      providerPaymentId: `mockpay_${suffix}`,
+      providerPaymentId,
       providerTransactionId: `mocktxn_${suffix}`,
-      paymentUrl: `https://mock-payments.local/pay/${input.internalPaymentId}`,
+      paymentUrl: `/dev/mock-grow/pay/${providerPaymentId}`,
       status: "payment_created",
       rawReference: {
         note: "Mock provider only. Real GROW request and response fields must be verified with the client's account later.",

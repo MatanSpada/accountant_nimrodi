@@ -1,5 +1,7 @@
 import type { PaymentListResult } from "../../domain/payments/payment-repository";
+import { isFinalPaymentStatus } from "../../domain/payments/payment-status";
 import type { Payment } from "../../domain/payments/payment-types";
+import type { PaymentWebhookRecord } from "../../domain/payments/payment-webhook-types";
 import { CLIENT_REQUIREMENTS_ITEMS } from "./client-requirements";
 import { escapeHtml, formatAmountAgorot, formatDateTime } from "./formatters";
 import { getPaymentStatusLabel } from "./status-labels";
@@ -231,6 +233,22 @@ function renderLayout(input: {
           color: var(--danger);
           border: 1px solid #ebc5c5;
         }
+        .success-box {
+          margin-bottom: 16px;
+          padding: 14px 16px;
+          border-radius: 12px;
+          background: #e6f2eb;
+          color: var(--success);
+          border: 1px solid #c7dfd1;
+        }
+        .warning-box {
+          margin-bottom: 16px;
+          padding: 14px 16px;
+          border-radius: 12px;
+          background: #f7eddc;
+          color: var(--warning);
+          border: 1px solid #e8d7b2;
+        }
         .details-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -281,6 +299,31 @@ function renderLayout(input: {
           color: var(--success);
           font-size: 0.95rem;
         }
+        .webhook-list {
+          display: grid;
+          gap: 12px;
+          margin-top: 16px;
+        }
+        .webhook-item {
+          padding: 16px;
+          border-radius: 14px;
+          border: 1px solid var(--line);
+          background: var(--surface);
+        }
+        .webhook-meta {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          margin-bottom: 8px;
+        }
+        .webhook-error {
+          margin-top: 10px;
+          color: var(--danger);
+        }
+        .card-stack {
+          display: grid;
+          gap: 24px;
+        }
         @media (max-width: 960px) {
           .layout, .grid, .stats, .form-grid.two-columns, .details-grid {
             grid-template-columns: 1fr;
@@ -309,7 +352,7 @@ function renderLayout(input: {
               .join("")}
           </nav>
           <div class="sidebar-note">
-            שלב 3 עדיין עובד עם provider מדומה בלבד. שליחת הקישור ללקוח נעשית ידנית, כולל פתיחת WhatsApp דרך קישור עזר.
+            שלב 4 עדיין עובד עם provider מדומה בלבד. כעת אפשר גם לדמות webhook נכנס ולבדוק עדכון סטטוס idempotent בלי GROW אמיתי.
           </div>
         </aside>
         <main>
@@ -346,9 +389,137 @@ function renderLayout(input: {
             if (feedback) feedback.textContent = "לא ניתן היה להעתיק את הקישור.";
           }
         });
+
+        document.addEventListener("submit", async (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLFormElement)) return;
+          if (!target.hasAttribute("data-mock-webhook-form")) return;
+
+          event.preventDefault();
+
+          const formData = new FormData(target);
+          const payload = Object.fromEntries(formData.entries());
+          payload.amount_agorot = Number(payload.amount_agorot);
+          payload.occurred_at = new Date().toISOString();
+
+          try {
+            const response = await fetch("/api/mock-grow/webhook", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            const redirectBase =
+              target.getAttribute("data-redirect") || window.location.pathname;
+            const query = new URLSearchParams({
+              simulator_outcome: String(data.outcome || "failed"),
+              simulator_message: String(
+                data.message || "סימולציית ה-webhook הסתיימה."
+              )
+            });
+
+            window.location.href = redirectBase + "?" + query.toString();
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "לא ניתן היה לשלוח את ה-webhook המדומה.";
+            const redirectBase =
+              target.getAttribute("data-redirect") || window.location.pathname;
+            const query = new URLSearchParams({
+              simulator_outcome: "failed",
+              simulator_message: message
+            });
+            window.location.href = redirectBase + "?" + query.toString();
+          }
+        });
       </script>
     </body>
   </html>`;
+}
+
+function renderSimulatorForms(payment: Payment, redirectPath: string) {
+  if (isFinalPaymentStatus(payment.status)) {
+    return `
+      <div class="note">
+        העסקה כבר נמצאת בסטטוס סופי. כדי לבדוק duplicate-safe behavior אפשר לשלוח שוב את אותו event_id דרך ה-API או דרך עמוד התשלום המדומה.
+      </div>
+    `;
+  }
+
+  const statuses = [
+    { eventType: "payment.paid", status: "paid", label: "סימולציה: שולם" },
+    { eventType: "payment.failed", status: "failed", label: "סימולציה: נכשל" },
+    {
+      eventType: "payment.cancelled",
+      status: "cancelled",
+      label: "סימולציה: בוטל"
+    },
+    {
+      eventType: "payment.expired",
+      status: "expired",
+      label: "סימולציה: פג תוקף"
+    }
+  ] as const;
+
+  return `
+    <div class="button-row">
+      ${statuses
+        .map(
+          ({ eventType, status, label }) => `
+            <form method="post" data-mock-webhook-form data-redirect="${escapeHtml(redirectPath)}">
+              <input type="hidden" name="event_id" value="mock_evt_${escapeHtml(payment.id)}_${status}" />
+              <input type="hidden" name="event_type" value="${eventType}" />
+              <input type="hidden" name="provider" value="mock_grow" />
+              <input type="hidden" name="provider_payment_id" value="${escapeHtml(payment.providerPaymentId ?? "")}" />
+              <input type="hidden" name="provider_transaction_id" value="${escapeHtml(payment.providerTransactionId ?? "")}" />
+              <input type="hidden" name="status" value="${status}" />
+              <input type="hidden" name="amount_agorot" value="${payment.amountAgorot}" />
+              <input type="hidden" name="currency" value="${escapeHtml(payment.currency)}" />
+              <button type="submit">${label}</button>
+            </form>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderWebhookRecords(webhooks: PaymentWebhookRecord[]) {
+  if (webhooks.length === 0) {
+    return `
+      <div class="empty-state">
+        עדיין לא התקבלו webhook-ים עבור העסקה הזאת.
+      </div>
+    `;
+  }
+
+  return `
+    <div class="webhook-list">
+      ${webhooks
+        .map(
+          (webhook) => `
+            <div class="webhook-item">
+              <div class="webhook-meta">
+                <span class="status-badge">${escapeHtml(webhook.eventType)}</span>
+                <span class="status-badge">${escapeHtml(webhook.processingStatus)}</span>
+                <span>${formatDateTime(webhook.receivedAt)}</span>
+              </div>
+              <div><strong>Provider event ID</strong> ${escapeHtml(webhook.providerEventId ?? "—")}</div>
+              <div><strong>Provider transaction ID</strong> ${escapeHtml(webhook.providerTransactionId ?? "—")}</div>
+              <div><strong>עובד בתאריך</strong> ${formatDateTime(webhook.processedAt)}</div>
+              ${
+                webhook.processingError
+                  ? `<div class="webhook-error"><strong>שגיאה</strong> ${escapeHtml(webhook.processingError)}</div>`
+                  : ""
+              }
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function renderPaymentRows(payments: Payment[]) {
@@ -596,7 +767,12 @@ export function renderPaymentsListPage(input: { payments: PaymentListResult }) {
   });
 }
 
-export function renderPaymentDetailsPage(input: { payment: Payment }) {
+export function renderPaymentDetailsPage(input: {
+  payment: Payment;
+  webhooks: PaymentWebhookRecord[];
+  simulatorMessage?: string | null;
+  simulatorOutcome?: string | null;
+}) {
   const whatsappLink = buildWhatsAppLink({
     customerName: input.payment.customerName,
     customerPhone: input.payment.customerPhone,
@@ -612,56 +788,123 @@ export function renderPaymentDetailsPage(input: { payment: Payment }) {
     content: `
       <section class="hero">
         <h2>פרטי בקשת תשלום</h2>
-        <p>אפשר להעתיק את הקישור, לפתוח הודעת WhatsApp ידנית, ולעיין בכל פרטי העסקה כפי שנשמרו במערכת.</p>
+        <p>אפשר להעתיק את הקישור, לפתוח הודעת WhatsApp ידנית, ולעיין בפרטי העסקה ובאירועי ה-webhook שנשמרו במערכת.</p>
       </section>
-      <section class="card">
-        <h3>${escapeHtml(input.payment.customerName)}</h3>
-        <p><span class="status-badge">${getPaymentStatusLabel(input.payment.status)}</span></p>
-        <div class="details-grid">
-          <div class="detail"><strong>סכום</strong>${formatAmountAgorot(input.payment.amountAgorot)}</div>
-          <div class="detail"><strong>תיאור</strong>${escapeHtml(input.payment.description)}</div>
-          <div class="detail"><strong>טלפון</strong>${escapeHtml(input.payment.customerPhone ?? "—")}</div>
-          <div class="detail"><strong>אימייל</strong>${escapeHtml(input.payment.customerEmail ?? "—")}</div>
-          <div class="detail"><strong>סטטוס פנימי</strong>${escapeHtml(input.payment.status)}</div>
-          <div class="detail"><strong>סטטוס להצגה</strong>${getPaymentStatusLabel(input.payment.status)}</div>
-          <div class="detail"><strong>Provider</strong>${escapeHtml(input.payment.provider)}</div>
-          <div class="detail"><strong>Provider Payment ID</strong>${escapeHtml(input.payment.providerPaymentId ?? "—")}</div>
-          <div class="detail"><strong>Provider Transaction ID</strong>${escapeHtml(input.payment.providerTransactionId ?? "—")}</div>
-          <div class="detail"><strong>Invoice ID</strong>${escapeHtml(input.payment.invoiceId ?? "—")}</div>
-          <div class="detail"><strong>נוצר בתאריך</strong>${formatDateTime(input.payment.createdAt)}</div>
-          <div class="detail"><strong>עודכן בתאריך</strong>${formatDateTime(input.payment.updatedAt)}</div>
-          <div class="detail"><strong>שולם בתאריך</strong>${formatDateTime(input.payment.paidAt)}</div>
-          <div class="detail"><strong>בוטל בתאריך</strong>${formatDateTime(input.payment.cancelledAt)}</div>
-          <div class="detail"><strong>נכשל בתאריך</strong>${formatDateTime(input.payment.failedAt)}</div>
-          <div class="detail"><strong>קישור לתשלום</strong>${
-            input.payment.paymentUrl
-              ? `<div class="inline-code">${escapeHtml(input.payment.paymentUrl)}</div>`
-              : "—"
-          }</div>
-        </div>
-        <div class="button-row">
+      <div class="card-stack">
+        <section class="card">
           ${
-            input.payment.paymentUrl
-              ? `
-                <button
-                  type="button"
-                  data-copy-text="${escapeHtml(input.payment.paymentUrl)}"
-                  data-copy-feedback="copy-feedback"
-                >
-                  העתקת קישור
-                </button>
-                <span id="copy-feedback" class="copy-feedback" aria-live="polite"></span>
-              `
+            input.simulatorMessage
+              ? input.simulatorOutcome === "failed"
+                ? `<div class="error-box">${escapeHtml(input.simulatorMessage)}</div>`
+                : input.simulatorOutcome === "duplicate"
+                  ? `<div class="warning-box">${escapeHtml(input.simulatorMessage)}</div>`
+                  : `<div class="success-box">${escapeHtml(input.simulatorMessage)}</div>`
               : ""
           }
-          ${
-            whatsappLink
-              ? `<a class="button whatsapp" href="${escapeHtml(whatsappLink)}" target="_blank" rel="noreferrer">פתיחת WhatsApp</a>`
-              : `<div class="note">WhatsApp זמין רק כאשר יש טלפון תקין וקישור תשלום קיים.</div>`
-          }
-          <a class="button secondary" href="/admin/payments">חזרה לרשימת העסקאות</a>
-        </div>
+          <h3>${escapeHtml(input.payment.customerName)}</h3>
+          <p><span class="status-badge">${getPaymentStatusLabel(input.payment.status)}</span></p>
+          <div class="details-grid">
+            <div class="detail"><strong>סכום</strong>${formatAmountAgorot(input.payment.amountAgorot)}</div>
+            <div class="detail"><strong>תיאור</strong>${escapeHtml(input.payment.description)}</div>
+            <div class="detail"><strong>טלפון</strong>${escapeHtml(input.payment.customerPhone ?? "—")}</div>
+            <div class="detail"><strong>אימייל</strong>${escapeHtml(input.payment.customerEmail ?? "—")}</div>
+            <div class="detail"><strong>סטטוס פנימי</strong>${escapeHtml(input.payment.status)}</div>
+            <div class="detail"><strong>סטטוס להצגה</strong>${getPaymentStatusLabel(input.payment.status)}</div>
+            <div class="detail"><strong>Provider</strong>${escapeHtml(input.payment.provider)}</div>
+            <div class="detail"><strong>Provider Payment ID</strong>${escapeHtml(input.payment.providerPaymentId ?? "—")}</div>
+            <div class="detail"><strong>Provider Transaction ID</strong>${escapeHtml(input.payment.providerTransactionId ?? "—")}</div>
+            <div class="detail"><strong>Invoice ID</strong>${escapeHtml(input.payment.invoiceId ?? "—")}</div>
+            <div class="detail"><strong>נוצר בתאריך</strong>${formatDateTime(input.payment.createdAt)}</div>
+            <div class="detail"><strong>עודכן בתאריך</strong>${formatDateTime(input.payment.updatedAt)}</div>
+            <div class="detail"><strong>שולם בתאריך</strong>${formatDateTime(input.payment.paidAt)}</div>
+            <div class="detail"><strong>בוטל בתאריך</strong>${formatDateTime(input.payment.cancelledAt)}</div>
+            <div class="detail"><strong>נכשל בתאריך</strong>${formatDateTime(input.payment.failedAt)}</div>
+            <div class="detail"><strong>קישור לתשלום</strong>${
+              input.payment.paymentUrl
+                ? `<div class="inline-code">${escapeHtml(input.payment.paymentUrl)}</div>`
+                : "—"
+            }</div>
+          </div>
+          <div class="button-row">
+            ${
+              input.payment.paymentUrl
+                ? `
+                  <button
+                    type="button"
+                    data-copy-text="${escapeHtml(input.payment.paymentUrl)}"
+                    data-copy-feedback="copy-feedback"
+                  >
+                    העתקת קישור
+                  </button>
+                  <span id="copy-feedback" class="copy-feedback" aria-live="polite"></span>
+                  <a class="button secondary" href="${escapeHtml(input.payment.paymentUrl)}" target="_blank" rel="noreferrer">פתיחת עמוד תשלום מדומה</a>
+                `
+                : ""
+            }
+            ${
+              whatsappLink
+                ? `<a class="button whatsapp" href="${escapeHtml(whatsappLink)}" target="_blank" rel="noreferrer">פתיחת WhatsApp</a>`
+                : `<div class="note">WhatsApp זמין רק כאשר יש טלפון תקין וקישור תשלום קיים.</div>`
+            }
+            <a class="button secondary" href="/admin/payments">חזרה לרשימת העסקאות</a>
+          </div>
+        </section>
+        <section class="card">
+          <h3>סימולטור פיתוח — לא GROW אמיתי</h3>
+          <p>הכפתורים למטה שולחים payload מדומה ל-<span class="inline-code">/api/mock-grow/webhook</span> כדי לבדוק את שרשרת העדכון: שמירת webhook, אימות, ועדכון סטטוס התשלום.</p>
+          ${renderSimulatorForms(input.payment, `/admin/payments/${input.payment.id}`)}
+          <div class="note">אין כאן schema אמיתי של GROW. המימוש הסופי יתבצע רק לאחר קבלת payloads מאומתים מהחשבון של הלקוח.</div>
+        </section>
+        <section class="card">
+          <h3>Webhook-ים אחרונים</h3>
+          <p>תצוגת audit פשוטה של אירועי webhook שנשמרו עבור העסקה הזאת.</p>
+          ${renderWebhookRecords(input.webhooks)}
+        </section>
+      </div>
+    `
+  });
+}
+
+export function renderMockGrowPaymentPage(input: {
+  payment: Payment;
+  webhooks: PaymentWebhookRecord[];
+}) {
+  return renderLayout({
+    title: `עמוד תשלום מדומה ${input.payment.id} — נמרודי ושות׳`,
+    activePath: "payments",
+    pageTitle: "עמוד תשלום מדומה",
+    content: `
+      <section class="hero">
+        <h2>עמוד תשלום מדומה — לצורכי פיתוח בלבד</h2>
+        <p>זהו עמוד סימולציה מקומי בלבד. הוא לא משקף את חוויית GROW האמיתית ולא את payload ה-webhook האמיתי.</p>
       </section>
+      <div class="card-stack">
+        <section class="card">
+          <h3>${escapeHtml(input.payment.customerName)}</h3>
+          <p><span class="status-badge">${getPaymentStatusLabel(input.payment.status)}</span></p>
+          <div class="details-grid">
+            <div class="detail"><strong>Provider Payment ID</strong>${escapeHtml(input.payment.providerPaymentId ?? "—")}</div>
+            <div class="detail"><strong>Provider Transaction ID</strong>${escapeHtml(input.payment.providerTransactionId ?? "—")}</div>
+            <div class="detail"><strong>סכום</strong>${formatAmountAgorot(input.payment.amountAgorot)}</div>
+            <div class="detail"><strong>תיאור</strong>${escapeHtml(input.payment.description)}</div>
+          </div>
+        </section>
+        <section class="card">
+          <h3>פעולות סימולציה</h3>
+          <p>הכפתורים שולחים webhook מדומה לשרת. זו הדרך שבה בודקים את הזרימה הקריטית בשלב זה.</p>
+          ${renderSimulatorForms(
+            input.payment,
+            `/dev/mock-grow/pay/${input.payment.providerPaymentId ?? ""}`
+          )}
+        </section>
+        <section class="card">
+          <h3>Webhook-ים אחרונים</h3>
+          ${renderWebhookRecords(input.webhooks)}
+          <div class="button-row">
+            <a class="button secondary" href="/admin/payments/${input.payment.id}">מעבר לפרטי העסקה במערכת</a>
+          </div>
+        </section>
+      </div>
     `
   });
 }

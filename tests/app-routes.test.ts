@@ -61,12 +61,89 @@ describe("app routes", () => {
       payment: { id: string; paymentUrl: string };
     };
     expect(detailPayload.payment.id).toBe(createdPayload.payment.id);
-    expect(detailPayload.payment.paymentUrl).toContain(
-      "https://mock-payments.local/pay/"
+    expect(detailPayload.payment.paymentUrl).toContain("/dev/mock-grow/pay/");
+  });
+
+  it("processes mock webhooks and rejects the real grow endpoint for now", async () => {
+    const { app } = createTestApp();
+
+    const createResponse = await app.request("/api/payments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        customer_name: "לקוח webhook",
+        customer_phone: "0500000002",
+        customer_email: "webhook-route@example.com",
+        amount_shekel: "750.00",
+        description: "בדיקת route"
+      })
+    });
+    const createPayload = (await createResponse.json()) as {
+      payment: {
+        id: string;
+        providerPaymentId: string;
+        providerTransactionId: string;
+      };
+    };
+
+    const webhookPayload = {
+      event_id: "evt_route_paid",
+      event_type: "payment.paid",
+      provider: "mock_grow",
+      provider_payment_id: createPayload.payment.providerPaymentId,
+      provider_transaction_id: createPayload.payment.providerTransactionId,
+      status: "paid",
+      amount_agorot: 75000,
+      currency: "ILS",
+      occurred_at: "2026-07-09T10:00:00.000Z"
+    };
+
+    const webhookResponse = await app.request("/api/mock-grow/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(webhookPayload)
+    });
+    expect(webhookResponse.status).toBe(200);
+    const webhookResult = (await webhookResponse.json()) as {
+      outcome: string;
+      payment: { status: string };
+    };
+    expect(webhookResult.outcome).toBe("processed");
+    expect(webhookResult.payment.status).toBe("paid");
+
+    const duplicateResponse = await app.request("/api/mock-grow/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(webhookPayload)
+    });
+    expect(duplicateResponse.status).toBe(200);
+    const duplicateResult = (await duplicateResponse.json()) as {
+      outcome: string;
+      duplicate: boolean;
+    };
+    expect(duplicateResult.outcome).toBe("duplicate");
+    expect(duplicateResult.duplicate).toBe(true);
+
+    const growWebhookResponse = await app.request("/api/grow/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+    expect(growWebhookResponse.status).toBe(501);
+    expect(await growWebhookResponse.text()).toContain(
+      "Use /api/mock-grow/webhook in development."
     );
   });
 
-  it("renders admin pages for dashboard, create, list, details and settings", async () => {
+  it("renders admin pages for dashboard, create, list, details, settings and mock pay page", async () => {
     const { app } = createTestApp();
 
     const createResponse = await app.request("/api/payments", {
@@ -105,6 +182,23 @@ describe("app routes", () => {
     const detailHtml = await detailPage.text();
     expect(detailHtml).toContain("פתיחת WhatsApp");
     expect(detailHtml).toContain("העתקת קישור");
+    expect(detailHtml).toContain("סימולטור פיתוח — לא GROW אמיתי");
+    expect(detailHtml).toContain("/api/mock-grow/webhook");
+
+    const paymentApiResponse = await app.request(
+      `/api/payments/${createPayload.payment.id}`
+    );
+    const paymentApiPayload = (await paymentApiResponse.json()) as {
+      payment: { providerPaymentId: string };
+    };
+
+    const mockPayPage = await app.request(
+      `/dev/mock-grow/pay/${paymentApiPayload.payment.providerPaymentId}`
+    );
+    expect(mockPayPage.status).toBe(200);
+    expect(await mockPayPage.text()).toContain(
+      "עמוד תשלום מדומה — לצורכי פיתוח בלבד"
+    );
 
     const settingsPage = await app.request(
       "/admin/settings/client-requirements"

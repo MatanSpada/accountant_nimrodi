@@ -88,6 +88,18 @@ export class InMemoryPaymentRepository implements PaymentRepository {
     return this.payments.get(id) ?? null;
   }
 
+  async findByProviderPaymentId(
+    providerPaymentId: string
+  ): Promise<Payment | null> {
+    for (const payment of this.payments.values()) {
+      if (payment.providerPaymentId === providerPaymentId) {
+        return payment;
+      }
+    }
+
+    return null;
+  }
+
   async findByProviderTransactionId(
     providerTransactionId: string
   ): Promise<Payment | null> {
@@ -206,6 +218,32 @@ export class InMemoryPaymentRepository implements PaymentRepository {
 
     this.webhooks.set(webhook.id, webhook);
     return webhook;
+  }
+
+  async findWebhookByProviderEventId(
+    provider: string,
+    providerEventId: string
+  ): Promise<PaymentWebhookRecord | null> {
+    for (const webhook of this.webhooks.values()) {
+      if (
+        webhook.provider === provider &&
+        webhook.providerEventId === providerEventId
+      ) {
+        return webhook;
+      }
+    }
+
+    return null;
+  }
+
+  async listWebhooksByPaymentId(
+    paymentId: string,
+    limit = 10
+  ): Promise<PaymentWebhookRecord[]> {
+    return [...this.webhooks.values()]
+      .filter((webhook) => webhook.paymentId === paymentId)
+      .sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))
+      .slice(0, Math.max(1, Math.min(limit, 50)));
   }
 
   async markWebhookProcessed(

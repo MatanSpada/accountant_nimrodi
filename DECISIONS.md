@@ -151,3 +151,61 @@
 - I kept D1-specific logic in `infrastructure/db`.
 - I kept provider-specific mock behavior inside the provider layer.
 - I added UI-specific helpers such as status labels and WhatsApp links under `src/ui/admin` so they do not leak into domain or repository code.
+
+## Mock webhook schema decision
+
+- I added a mock webhook schema only for local development at `POST /api/mock-grow/webhook`.
+- Meaning:
+  - the team can prove the critical backend path now: payment created -> webhook stored -> status updated -> duplicate event ignored safely
+  - the parser stays clearly isolated from the rest of the payment business logic
+- Tradeoff:
+  - this schema is intentionally not reusable as a real GROW parser
+  - the real parser must be written later from verified client payloads
+
+## Why real GROW webhook is intentionally not implemented yet
+
+- The project still lacks verified sandbox or production webhook payloads from the client's GROW account.
+- Implementing a "best guess" parser now would create false confidence and brittle assumptions.
+- Meaning:
+  - `/api/grow/webhook` is reserved but returns `501 Not Implemented`
+  - the rest of the system can still be tested end-to-end through the mock simulator
+- Tradeoff:
+  - no real provider signature or webhook retry behavior is covered yet
+
+## Webhook idempotency approach
+
+- Webhook records are deduplicated by `(provider, provider_event_id)`.
+- The processor checks for an existing event before creating a new record or applying side effects.
+- Meaning:
+  - sending the same `event_id` twice is safe
+  - later invoice-generation logic can rely on the same protection boundary
+- Tradeoff:
+  - this phase treats duplicate `event_id` as a no-op instead of a replayable retry path
+
+## Duplicate webhook behavior decision
+
+- Duplicate event IDs return a successful duplicate-safe response instead of an error.
+- Meaning:
+  - provider retries or manual repeated simulator calls do not break the flow
+  - operators can safely test duplicate delivery behavior
+- Tradeoff:
+  - duplicate attempts are not stored as separate rows in this MVP
+  - if detailed delivery-attempt auditing is needed later, a separate attempts table can be added
+
+## Why admin simulation triggers a webhook instead of direct status update
+
+- The admin simulator buttons call `POST /api/mock-grow/webhook` rather than updating the payment directly.
+- Meaning:
+  - the application exercises the real backend control flow that matters later in production
+  - validation, raw payload storage, idempotency, and status-transition logic are tested together
+- Tradeoff:
+  - the simulator adds a little client-side JavaScript instead of a simpler direct update form
+
+## Mock payment page decision
+
+- I changed the mock payment URL to a local Worker route under `/dev/mock-grow/pay/:providerPaymentId`.
+- Meaning:
+  - the fake payment link is now usable during local development
+  - the office flow and the customer-side simulation can both be tested without leaving the app
+- Tradeoff:
+  - the stored URL is intentionally local-development-oriented and not shareable as a real external payment link

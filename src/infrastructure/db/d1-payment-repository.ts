@@ -199,6 +199,44 @@ export class D1PaymentRepository implements PaymentRepository {
     return row ? mapPaymentRow(row) : null;
   }
 
+  async findByProviderPaymentId(
+    providerPaymentId: string
+  ): Promise<Payment | null> {
+    const row = await this.db
+      .prepare(
+        `
+          SELECT
+            id,
+            customer_id,
+            customer_name,
+            customer_phone,
+            customer_email,
+            amount_agorot,
+            currency,
+            description,
+            status,
+            provider,
+            provider_payment_id,
+            provider_transaction_id,
+            payment_url,
+            invoice_id,
+            external_crm_deal_id,
+            created_at,
+            updated_at,
+            paid_at,
+            cancelled_at,
+            failed_at
+          FROM payments
+          WHERE provider_payment_id = ?
+          LIMIT 1
+        `
+      )
+      .bind(providerPaymentId)
+      .first<D1PaymentRow>();
+
+    return row ? mapPaymentRow(row) : null;
+  }
+
   async findByProviderTransactionId(
     providerTransactionId: string
   ): Promise<Payment | null> {
@@ -492,6 +530,68 @@ export class D1PaymentRepository implements PaymentRepository {
       .first<D1WebhookRow>();
 
     return mapWebhookRow(row as D1WebhookRow);
+  }
+
+  async findWebhookByProviderEventId(
+    provider: string,
+    providerEventId: string
+  ): Promise<PaymentWebhookRecord | null> {
+    const row = await this.db
+      .prepare(
+        `
+          SELECT
+            id,
+            payment_id,
+            provider,
+            provider_event_id,
+            provider_transaction_id,
+            event_type,
+            raw_payload,
+            received_at,
+            processed_at,
+            processing_status,
+            processing_error
+          FROM payment_webhooks
+          WHERE provider = ?
+            AND provider_event_id = ?
+          LIMIT 1
+        `
+      )
+      .bind(provider, providerEventId)
+      .first<D1WebhookRow>();
+
+    return row ? mapWebhookRow(row) : null;
+  }
+
+  async listWebhooksByPaymentId(
+    paymentId: string,
+    limit = 10
+  ): Promise<PaymentWebhookRecord[]> {
+    const result = await this.db
+      .prepare(
+        `
+          SELECT
+            id,
+            payment_id,
+            provider,
+            provider_event_id,
+            provider_transaction_id,
+            event_type,
+            raw_payload,
+            received_at,
+            processed_at,
+            processing_status,
+            processing_error
+          FROM payment_webhooks
+          WHERE payment_id = ?
+          ORDER BY received_at DESC
+          LIMIT ?
+        `
+      )
+      .bind(paymentId, Math.max(1, Math.min(limit, 50)))
+      .all<D1WebhookRow>();
+
+    return (result.results ?? []).map(mapWebhookRow);
   }
 
   async markWebhookProcessed(

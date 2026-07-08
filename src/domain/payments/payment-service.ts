@@ -72,6 +72,12 @@ export class PaymentService {
     return this.dependencies.paymentRepository.findById(paymentId);
   }
 
+  async getPaymentByProviderPaymentId(providerPaymentId: string) {
+    return this.dependencies.paymentRepository.findByProviderPaymentId(
+      providerPaymentId
+    );
+  }
+
   async listPayments(options?: PaymentListOptions) {
     return this.dependencies.paymentRepository.list(options);
   }

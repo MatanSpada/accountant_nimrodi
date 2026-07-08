@@ -20,8 +20,6 @@ describe("MockPaymentProvider", () => {
     expect(result.status).toBe("payment_created");
     expect(result.providerPaymentId).toBe("mockpay_00pqlohn");
     expect(result.providerTransactionId).toBe("mocktxn_00pqlohn");
-    expect(result.paymentUrl).toBe(
-      "https://mock-payments.local/pay/pay_test_123"
-    );
+    expect(result.paymentUrl).toBe("/dev/mock-grow/pay/mockpay_00pqlohn");
   });
 });

@@ -60,7 +60,19 @@ export function registerAdminRoutes(
       throw new AppError("בקשת התשלום לא נמצאה.", 404);
     }
 
-    return c.html(renderPaymentDetailsPage({ payment }));
+    const webhooks = await container.paymentWebhookService.listPaymentWebhooks(
+      payment.id,
+      10
+    );
+
+    return c.html(
+      renderPaymentDetailsPage({
+        payment,
+        webhooks,
+        simulatorMessage: c.req.query("simulator_message") ?? null,
+        simulatorOutcome: c.req.query("simulator_outcome") ?? null
+      })
+    );
   });
 
   app.get("/admin/settings/client-requirements", (c) => {

@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { registerAdminRoutes } from "../routes/admin-routes";
 import { registerApiRoutes } from "../routes/api-routes";
 import { registerHealthRoutes } from "../routes/health-routes";
+import { registerWebhookRoutes } from "../routes/webhook-routes";
 import { errorMiddleware } from "../middleware/error-middleware";
 import { requestLoggerMiddleware } from "../middleware/request-logger-middleware";
 
@@ -20,6 +21,7 @@ export function createApp(options?: {
   registerHealthRoutes(app);
   registerAdminRoutes(app, getContainer);
   registerApiRoutes(app, getContainer);
+  registerWebhookRoutes(app, getContainer);
 
   return app;
 }
