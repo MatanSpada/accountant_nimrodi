@@ -32,6 +32,7 @@ export function createContainer(
 
   return {
     paymentRepository,
+    customerRepository,
     paymentProvider,
     invoiceProvider,
     crmProvider,
@@ -42,3 +43,5 @@ export function createContainer(
     })
   };
 }
+
+export type AppContainer = ReturnType<typeof createContainer>;

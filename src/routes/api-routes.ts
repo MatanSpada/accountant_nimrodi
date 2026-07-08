@@ -1,11 +1,15 @@
 import type { Hono } from "hono";
 
-import { createContainer } from "../app/container";
+import type { AppContainer } from "../app/container";
 import { AppError } from "../shared/errors/app-error";
+import { normalizeCreatePaymentApiInput } from "../domain/payments/payment-validation";
 
-export function registerApiRoutes(app: Hono<{ Bindings: Env }>) {
+export function registerApiRoutes(
+  app: Hono<{ Bindings: Env }>,
+  getContainer: (env?: Env) => AppContainer
+) {
   app.get("/api/payments", async (c) => {
-    const container = createContainer(c.env);
+    const container = getContainer(c.env);
     const limit = Number(c.req.query("limit") ?? "20");
     const offset = Number(c.req.query("offset") ?? "0");
     const payments = await container.paymentService.listPayments({
@@ -17,7 +21,7 @@ export function registerApiRoutes(app: Hono<{ Bindings: Env }>) {
   });
 
   app.get("/api/payments/:id", async (c) => {
-    const container = createContainer(c.env);
+    const container = getContainer(c.env);
     const payment = await container.paymentService.getPaymentById(
       c.req.param("id")
     );
@@ -30,12 +34,13 @@ export function registerApiRoutes(app: Hono<{ Bindings: Env }>) {
   });
 
   app.post("/api/payments", async (c) => {
-    const container = createContainer(c.env);
+    const container = getContainer(c.env);
     const body = await c.req.json().catch(() => {
       throw new AppError("גוף הבקשה חייב להיות JSON תקין.", 400);
     });
 
-    const payment = await container.paymentService.createPaymentRequest(body);
+    const input = normalizeCreatePaymentApiInput(body);
+    const payment = await container.paymentService.createPaymentRequest(input);
     return c.json({ payment }, 201);
   });
 }

@@ -96,6 +96,45 @@
 - Tradeoff:
   - D1 repository behavior is verified mainly through local migrations/dev runtime plus in-memory unit tests, not a full database integration suite yet
 
+## Admin UI approach
+
+- The admin UI stays server-rendered with Hono HTML responses and minimal vanilla JavaScript.
+- Meaning:
+  - the app stays lightweight
+  - the UI can be hosted from the same Worker without adding a separate frontend build pipeline
+  - the code stays close to the backend flow while the product is still internal and small
+- Tradeoff:
+  - interactions are simpler than a full SPA
+  - more advanced future UI behavior may require progressive enhancement or a dedicated frontend layer
+
+## Manual WhatsApp helper decision
+
+- WhatsApp is implemented as a manual helper link using `https://wa.me/...`.
+- Meaning:
+  - the office user can click a generated link and manually send the prepared message
+  - no Meta approval, webhook setup, or WhatsApp Business API integration is required in this phase
+- Tradeoff:
+  - sending is not automated
+  - there is no delivery tracking or outgoing message audit from within the system
+
+## Why no WhatsApp API yet
+
+- The business goal in this phase is only to help the office send the payment link manually.
+- The WhatsApp API would add approval, compliance, and operational complexity too early.
+- Tradeoff:
+  - manual operator action is still required for every customer send
+
+## Why GROW remains mocked
+
+- Real GROW request/response behavior is still unverified against the client's real account.
+- Keeping GROW mocked preserves architectural progress without fabricating production assumptions.
+- Meaning:
+  - the admin flow, persistence flow, and manual send flow can be finished now
+  - only the provider adapter needs to change later
+- Tradeoff:
+  - no real money movement is tested yet
+  - no real provider failure modes are covered yet
+
 ## Frontend approach decision
 
 - I kept server-rendered HTML from the Worker instead of introducing a heavy frontend framework.
@@ -108,6 +147,7 @@
 
 ## Folder structure decision
 
-- I preserved the phase 1 separation between route, middleware, domain, infrastructure, shared, and UI layers.
-- I added domain types and repositories for customers and webhook/invoice persistence concerns without collapsing them into route code.
-- I kept D1-specific logic in `infrastructure/db` and did not hardcode Cloudflare assumptions into domain files.
+- I preserved the phase 1 and phase 2 separation between route, middleware, domain, infrastructure, shared, and UI layers.
+- I kept D1-specific logic in `infrastructure/db`.
+- I kept provider-specific mock behavior inside the provider layer.
+- I added UI-specific helpers such as status labels and WhatsApp links under `src/ui/admin` so they do not leak into domain or repository code.

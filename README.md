@@ -1,6 +1,6 @@
 # מערכת תשלומים פנימית — נמרודי ושות׳
 
-Phase 2 of an internal payment-request system for "נמרודי ושות׳ – רואי חשבון".
+Phase 3 of an internal payment-request system for "נמרודי ושות׳ – רואי חשבון".
 
 The long-term business flow is:
 
@@ -10,16 +10,20 @@ The long-term business flow is:
 4. Webhooks later update the payment status.
 5. Receipt / invoice logic is added in a later phase.
 
-This phase still does **not** connect to real GROW. It implements the real database/domain persistence layer on Cloudflare D1 while keeping the provider mocked.
+This phase still does **not** connect to real GROW. It adds the internal admin payment flow on top of the mock provider and the D1-backed persistence layer.
 
 ## Current phase status
 
 - Cloudflare Workers + Hono foundation is active.
-- D1-backed repositories now power runtime persistence for customers, payments, and webhook records.
-- The domain layer now includes payment statuses, invoice statuses, webhook processing statuses, and currency validation.
-- The mock payment provider still creates deterministic fake payment links.
-- Internal API read endpoints exist for inspecting payments.
-- Admin shell still loads in Hebrew RTL and reads from the repository layer.
+- D1-backed repositories persist customers, payments, and webhook records.
+- Internal admin UI now supports:
+  - dashboard
+  - new payment form
+  - payments list
+  - payment details page
+  - client requirements page
+- A user can create a mock payment link from the admin UI, copy it, and open a manual WhatsApp link.
+- Payment list and payment details pages read from the repository layer.
 - No authentication yet.
 - No real GROW integration yet.
 - No production webhook processing flow yet.
@@ -114,6 +118,13 @@ Then open:
 http://127.0.0.1:8787
 ```
 
+## Admin URLs
+
+- Dashboard: `http://127.0.0.1:8787/`
+- New payment: `http://127.0.0.1:8787/admin/payments/new`
+- Payments list: `http://127.0.0.1:8787/admin/payments`
+- Client requirements: `http://127.0.0.1:8787/admin/settings/client-requirements`
+
 ## Internal API examples
 
 Create a mocked payment request:
@@ -122,11 +133,10 @@ Create a mocked payment request:
 curl -X POST http://127.0.0.1:8787/api/payments \
   -H "content-type: application/json" \
   -d '{
-    "customerName": "לקוח בדיקה",
-    "customerPhone": "0500000000",
-    "customerEmail": "test@example.com",
-    "amountAgorot": 125000,
-    "currency": "ILS",
+    "customer_name": "לקוח בדיקה",
+    "customer_phone": "0500000000",
+    "customer_email": "test@example.com",
+    "amount_shekel": "1250.00",
     "description": "שכר טרחה"
   }'
 ```
@@ -148,6 +158,25 @@ Health check:
 ```bash
 curl http://127.0.0.1:8787/health
 ```
+
+## Example local manual test flow
+
+1. Run `npm run db:migrate:local`
+2. Run `npm run dev -- --port 8787`
+3. Open `/admin/payments/new`
+4. Fill customer name, phone, email, amount in shekels, and description
+5. Submit the form
+6. Confirm the browser moves to the payment details page
+7. Confirm the details page shows:
+   - status
+   - amount
+   - customer details
+   - mock payment URL
+   - provider payment id
+   - copy link button
+   - WhatsApp link button
+8. Open `/admin/payments`
+9. Confirm the created payment appears in the list
 
 ## Tests
 
@@ -183,14 +212,18 @@ npm run db:migrate:local
 
 Notes:
 
-- Runtime persistence now uses the D1 binding from `wrangler.jsonc`.
+- Runtime persistence uses the D1 binding from `wrangler.jsonc`.
 - This repo still uses placeholder D1 IDs in `wrangler.jsonc` so the project can be scaffolded without client credentials.
 - Replace the placeholder `database_id` and `preview_database_id` before real deployment.
 - Local D1 testing in this phase is verified through:
   - `npm run db:migrate:local`
   - `npm run dev -- --port 8787`
   - `GET /health`
-  - loading the admin shell
+  - loading `/`
+  - loading `/admin/payments/new`
+  - creating a payment through the UI/API
+  - loading `/admin/payments`
+  - loading `/admin/payments/:id`
 - `compatibility_date` is pinned to `2025-07-18` because the verified local toolchain in this workspace is `Node 18.19.1` with `wrangler 3.114.17`.
 - When the project moves to `Node 22+` and `wrangler 4`, update the compatibility date to the current day before production rollout.
 
@@ -217,12 +250,33 @@ npm run deploy
 - Invoice / receipt provider
 - CRM provider
 - Payment URLs, payment IDs, and provider transaction IDs
+- WhatsApp sending itself
 
 Important:
 
 - The mock provider is intentionally deterministic for testing.
 - The mock provider does **not** claim to represent verified GROW production payloads.
+- WhatsApp is only a manual helper link in this phase. No WhatsApp Business API is used.
 - Real request / response shapes must be confirmed later against the client's real GROW account.
+
+## What is still missing from the client
+
+- Client-owned Cloudflare account
+- Technical/admin access for the developer
+- Client-owned GROW account
+- GROW userId
+- GROW pageCode
+- GROW API credentials if required
+- Sandbox details
+- Production details
+- Confirmation that bank transfer is enabled in GROW
+- Confirmation that API access is enabled in GROW
+- Confirmation that webhooks are enabled in GROW
+- Confirmation whether the payment page can be bank-transfer-only
+- Confirmation whether GROW issues receipts for bank-transfer payments
+- CRM access/API details if integrating with existing CRM
+- Invoice provider API details if receipts are issued outside GROW
+- Domain/subdomain decision, for example `payments.nimrodi.co.il` or temporary Cloudflare URL
 
 ## Verified commands in this phase
 
@@ -237,4 +291,6 @@ npm run db:migrate:local
 npm run dev -- --port 8787
 curl http://127.0.0.1:8787/health
 curl http://127.0.0.1:8787/
+curl http://127.0.0.1:8787/admin/payments/new
+curl http://127.0.0.1:8787/admin/payments
 ```

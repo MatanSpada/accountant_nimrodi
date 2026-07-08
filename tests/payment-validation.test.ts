@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { AppError } from "../src/shared/errors/app-error";
 import {
   assertValidAmountAgorot,
+  convertAmountShekelToAgorotForTesting,
+  normalizeCreatePaymentApiInput,
   normalizeCustomerEmail,
   normalizeCustomerPhone,
   validateCreatePaymentDraftInput
@@ -15,6 +17,11 @@ describe("payment validation", () => {
 
   it("rejects floating point money", () => {
     expect(() => assertValidAmountAgorot(123.45)).toThrow(AppError);
+  });
+
+  it("converts amount_shekel to amount_agorot", () => {
+    expect(convertAmountShekelToAgorotForTesting("1250.55")).toBe(125055);
+    expect(convertAmountShekelToAgorotForTesting(99.9)).toBe(9990);
   });
 
   it("normalizes israeli phone numbers pragmatically", () => {
@@ -52,6 +59,27 @@ describe("payment validation", () => {
       currency: "ILS",
       description: "שכר טרחה",
       externalCrmDealId: "deal-123"
+    });
+  });
+
+  it("normalizes API payloads from snake_case fields", () => {
+    const result = normalizeCreatePaymentApiInput({
+      customer_name: "לקוח",
+      customer_phone: "0501234567",
+      customer_email: "demo@example.com",
+      amount_shekel: "420.50",
+      currency: "ils",
+      description: "בדיקה"
+    });
+
+    expect(result).toEqual({
+      customerName: "לקוח",
+      customerPhone: "0501234567",
+      customerEmail: "demo@example.com",
+      amountAgorot: 42050,
+      currency: "ils",
+      description: "בדיקה",
+      externalCrmDealId: null
     });
   });
 });
