@@ -1,2 +1,2 @@
 export const D1_IMPLEMENTATION_TODO =
-  "TODO: Implement a D1-backed PaymentRepository in a later phase after real environment provisioning. Keep SQL and mapping isolated from route handlers.";
+  "D1-backed repositories are implemented in phase 2. Keep D1-specific SQL isolated under infrastructure/db so the domain layer remains portable.";

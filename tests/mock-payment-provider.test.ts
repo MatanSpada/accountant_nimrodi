@@ -17,7 +17,7 @@ describe("MockPaymentProvider", () => {
     });
 
     expect(result.provider).toBe("mock-grow");
-    expect(result.status).toBe("pending");
+    expect(result.status).toBe("payment_created");
     expect(result.providerPaymentId).toBe("mockpay_00pqlohn");
     expect(result.providerTransactionId).toBe("mocktxn_00pqlohn");
     expect(result.paymentUrl).toBe(

@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250408.0",
+    "@types/node": "^24.0.14",
     "@eslint/js": "^9.31.0",
     "eslint": "^9.31.0",
     "globals": "^16.3.0",

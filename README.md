@@ -1,6 +1,6 @@
 # מערכת תשלומים פנימית — נמרודי ושות׳
 
-Phase 1 foundation for an internal payment-request system for "נמרודי ושות׳ – רואי חשבון".
+Phase 2 of an internal payment-request system for "נמרודי ושות׳ – רואי חשבון".
 
 The long-term business flow is:
 
@@ -10,19 +10,20 @@ The long-term business flow is:
 4. Webhooks later update the payment status.
 5. Receipt / invoice logic is added in a later phase.
 
-This phase intentionally does **not** connect to real GROW. It builds the project foundation only.
+This phase still does **not** connect to real GROW. It implements the real database/domain persistence layer on Cloudflare D1 while keeping the provider mocked.
 
 ## Current phase status
 
-- Cloudflare Workers + Hono foundation created.
-- D1 binding and migrations scaffolded.
-- Provider interfaces defined for payments, invoices, and CRM.
-- Mock payment and invoice providers implemented for local development.
-- Minimal Hebrew RTL admin shell created.
-- Initial tests and CI workflow added.
+- Cloudflare Workers + Hono foundation is active.
+- D1-backed repositories now power runtime persistence for customers, payments, and webhook records.
+- The domain layer now includes payment statuses, invoice statuses, webhook processing statuses, and currency validation.
+- The mock payment provider still creates deterministic fake payment links.
+- Internal API read endpoints exist for inspecting payments.
+- Admin shell still loads in Hebrew RTL and reads from the repository layer.
 - No authentication yet.
 - No real GROW integration yet.
-- No real webhook handling yet.
+- No production webhook processing flow yet.
+- No real invoice provider integration yet.
 
 ## Tech stack
 
@@ -34,6 +35,63 @@ This phase intentionally does **not** connect to real GROW. It builds the projec
 - Vitest
 - ESLint
 - Prettier
+
+## Domain status meanings
+
+### Payment statuses
+
+- `draft`: internal record created before provider details were attached.
+- `payment_created`: a payment link was created successfully by the provider mock.
+- `pending`: a payment exists and is waiting on final outcome.
+- `paid`: payment completed successfully.
+- `failed`: payment attempt failed.
+- `cancelled`: payment was cancelled by office or payer flow.
+- `expired`: payment link or payment window expired.
+
+Final payment statuses:
+
+- `paid`
+- `failed`
+- `cancelled`
+- `expired`
+
+### Invoice statuses
+
+- `draft`
+- `issued`
+- `failed`
+- `cancelled`
+
+### Webhook processing statuses
+
+- `received`
+- `processed`
+- `failed`
+
+## Database schema overview
+
+### `customers`
+
+- canonical customer record for internal linking
+- stores `name`, `phone`, `email`, and optional `external_crm_customer_id`
+
+### `payments`
+
+- stores denormalized customer snapshot fields for auditability
+- stores only `amount_agorot` as integer money
+- stores provider IDs and payment URL
+- stores lifecycle timestamps such as `paid_at`, `cancelled_at`, `failed_at`
+
+### `payment_webhooks`
+
+- stores raw webhook payload text
+- stores provider event IDs and transaction IDs when known
+- tracks processing lifecycle separately from payment lifecycle
+
+### `invoices`
+
+- stores invoice linkage and raw provider payload text
+- currently schema-only in this phase
 
 ## Installation
 
@@ -47,7 +105,7 @@ npm run cf-typegen
 Start the Worker locally:
 
 ```bash
-npm run dev
+npm run dev -- --port 8787
 ```
 
 Then open:
@@ -56,7 +114,7 @@ Then open:
 http://127.0.0.1:8787
 ```
 
-## API examples
+## Internal API examples
 
 Create a mocked payment request:
 
@@ -73,10 +131,22 @@ curl -X POST http://127.0.0.1:8787/api/payments \
   }'
 ```
 
-List payments:
+List payments with basic pagination:
 
 ```bash
-curl http://127.0.0.1:8787/api/payments
+curl "http://127.0.0.1:8787/api/payments?limit=20&offset=0"
+```
+
+Get one payment:
+
+```bash
+curl http://127.0.0.1:8787/api/payments/<PAYMENT_ID>
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:8787/health
 ```
 
 ## Tests
@@ -99,7 +169,13 @@ npm run typecheck
 
 ## D1 migrations
 
-Local migration apply:
+Generate Worker binding types:
+
+```bash
+npm run cf-typegen
+```
+
+Apply migrations to local D1:
 
 ```bash
 npm run db:migrate:local
@@ -107,10 +183,16 @@ npm run db:migrate:local
 
 Notes:
 
-- This phase ships a placeholder D1 database ID in `wrangler.jsonc` so the project can be scaffolded without client credentials.
-- Replace the placeholder with a real D1 database ID before real deployment.
-- `compatibility_date` is currently pinned to `2025-07-18` because the verified local toolchain in this workspace is `Node 18.19.1` with `wrangler 3.114.17`.
-- When the project is moved to `Node 22+` and `wrangler 4`, update the compatibility date to the current day before production rollout.
+- Runtime persistence now uses the D1 binding from `wrangler.jsonc`.
+- This repo still uses placeholder D1 IDs in `wrangler.jsonc` so the project can be scaffolded without client credentials.
+- Replace the placeholder `database_id` and `preview_database_id` before real deployment.
+- Local D1 testing in this phase is verified through:
+  - `npm run db:migrate:local`
+  - `npm run dev -- --port 8787`
+  - `GET /health`
+  - loading the admin shell
+- `compatibility_date` is pinned to `2025-07-18` because the verified local toolchain in this workspace is `Node 18.19.1` with `wrangler 3.114.17`.
+- When the project moves to `Node 22+` and `wrangler 4`, update the compatibility date to the current day before production rollout.
 
 ## Deployment later to Cloudflare
 
@@ -144,8 +226,6 @@ Important:
 
 ## Verified commands in this phase
 
-The following commands are expected to be verified in this phase after install:
-
 ```bash
 npm install
 npm run cf-typegen
@@ -153,4 +233,8 @@ npm run format
 npm run lint
 npm run typecheck
 npm run test
+npm run db:migrate:local
+npm run dev -- --port 8787
+curl http://127.0.0.1:8787/health
+curl http://127.0.0.1:8787/
 ```

@@ -1,4 +1,4 @@
-import type { CreatePaymentRequestInput, Payment } from "./payment-types";
+import type { CreatePaymentDraftInput, Payment } from "./payment-types";
 import type { PaymentStatus } from "./payment-status";
 
 export interface ProviderPaymentRequest {
@@ -18,8 +18,9 @@ export interface ProviderPaymentStatusResult {
 }
 
 export interface PaymentProvider {
+  readonly providerKey: string;
   createPaymentRequest(
-    input: CreatePaymentRequestInput & { internalPaymentId: string }
+    input: CreatePaymentDraftInput & { internalPaymentId: string }
   ): Promise<ProviderPaymentRequest>;
   getPaymentStatus(
     providerPaymentId: string

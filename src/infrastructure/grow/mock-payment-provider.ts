@@ -3,7 +3,7 @@ import type {
   ProviderPaymentRequest,
   ProviderPaymentStatusResult
 } from "../../domain/payments/payment-provider";
-import type { CreatePaymentRequestInput } from "../../domain/payments/payment-types";
+import type { CreatePaymentDraftInput } from "../../domain/payments/payment-types";
 
 function createDeterministicSuffix(input: {
   internalPaymentId: string;
@@ -21,17 +21,19 @@ function createDeterministicSuffix(input: {
 }
 
 export class MockPaymentProvider implements PaymentProvider {
+  readonly providerKey = "mock-grow";
+
   async createPaymentRequest(
-    input: CreatePaymentRequestInput & { internalPaymentId: string }
+    input: CreatePaymentDraftInput & { internalPaymentId: string }
   ): Promise<ProviderPaymentRequest> {
     const suffix = createDeterministicSuffix(input);
 
     return {
-      provider: "mock-grow",
+      provider: this.providerKey,
       providerPaymentId: `mockpay_${suffix}`,
       providerTransactionId: `mocktxn_${suffix}`,
       paymentUrl: `https://mock-payments.local/pay/${input.internalPaymentId}`,
-      status: "pending",
+      status: "payment_created",
       rawReference: {
         note: "Mock provider only. Real GROW request and response fields must be verified with the client's account later.",
         suffix
@@ -49,10 +51,12 @@ export class MockPaymentProvider implements PaymentProvider {
         ? "failed"
         : lowered.includes("cancel")
           ? "cancelled"
-          : "pending";
+          : lowered.includes("expire")
+            ? "expired"
+            : "pending";
 
     return {
-      provider: "mock-grow",
+      provider: this.providerKey,
       providerPaymentId,
       providerTransactionId: providerPaymentId.replace("mockpay_", "mocktxn_"),
       status

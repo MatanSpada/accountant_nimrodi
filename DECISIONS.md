@@ -17,64 +17,97 @@
 ## Why D1 was selected for MVP
 
 - D1 is the lowest-friction relational option inside the same Cloudflare stack.
-- It avoids introducing paid external infrastructure in phase 1.
+- It avoids introducing paid external infrastructure in early phases.
 - It fits the current scope: modest internal transaction volume, simple relational tables, and low operational overhead.
 
 ## What it means to keep the database replaceable
 
 - Domain services depend on repository interfaces, not on D1 directly.
 - Route handlers do not execute SQL directly.
-- SQL concerns are intended to stay inside infrastructure adapters.
-- A future PostgreSQL or other repository implementation should be able to replace the D1 adapter without rewriting payment business logic.
+- SQL concerns stay inside `infrastructure/db`.
+- The D1 repository maps SQL rows into domain objects so the rest of the app does not depend on D1 column names.
+- A future PostgreSQL or other repository implementation should be able to replace the D1 adapters without rewriting payment business logic.
 
-## What it means to keep GROW replaceable
+## Why raw payloads are stored as text
 
-- Payment creation and payment status checks depend on `PaymentProvider`.
-- The system does not expose GROW-specific assumptions outside the provider boundary.
-- Mock behavior is explicit and isolated.
-- A future `GrowPaymentProvider` can be added without rewriting routes or payment orchestration code.
+- Real webhook and invoice payload formats are not yet verified against the client systems.
+- Storing the raw payload as JSON text preserves the original input for debugging, replay, and auditing.
+- Text storage is portable across SQLite/D1 and future relational databases.
+- Tradeoff:
+  - JSON text is less queryable than a normalized payload schema
+  - later phases can project selected verified fields into structured columns when needed
 
-## Tradeoffs of Cloudflare Workers vs a standard Node server
+## Why `amount_agorot` is used
 
-- Pros:
-  - simple deployment model
-  - low idle cost
-  - easy fit for HTTP APIs and webhook endpoints
-  - direct path to Cloudflare-native bindings like D1
-- Cons:
-  - less runtime flexibility than a traditional long-running Node server
-  - some Node packages behave differently or require `nodejs_compat`
-  - debugging background and persistence patterns is different from a standard server
-  - local parity depends on Wrangler and Cloudflare runtime tooling
+- Integer agorot avoids floating-point rounding bugs in money handling.
+- It makes validation and comparisons predictable across providers and databases.
+- Tradeoff:
+  - UI and reports must always format integer values explicitly back to human-readable currency
+
+## Payment/customer denormalization decision
+
+- Payments store both `customer_id` and snapshot fields such as `customer_name`, `customer_phone`, and `customer_email`.
+- Meaning:
+  - the app can link to a reusable customer record
+  - each payment still keeps the exact customer details used at creation time
+- Tradeoff:
+  - data exists in two places
+  - updates to customer records do not retroactively rewrite historical payment snapshots
+
+## Schema indexing decision
+
+- Indexes were added for:
+  - `payments.status`
+  - `payments.created_at`
+  - `payments.provider_transaction_id`
+  - CRM linkage columns
+  - customer identity columns
+  - webhook lookup columns
+- Meaning:
+  - the common internal admin lookups and webhook correlation flows stay simple and reasonably efficient
+- Tradeoff:
+  - each index slightly increases write cost
+  - for MVP this is acceptable because reads and support/debug flows matter more than micro-optimizing writes
+
+## Unique provider transaction decision
+
+- `payments(provider, provider_transaction_id)` is unique when `provider_transaction_id` is not null.
+- Meaning:
+  - the system protects itself from accidentally associating the same provider transaction with multiple internal payments
+- Tradeoff:
+  - if a provider behaves unexpectedly, support staff may need a manual remediation path later
+
+## Customer resolution decision
+
+- When creating a payment, the service attempts to reuse an existing customer by exact normalized email first, then exact normalized phone.
+- If no match exists, a new customer is created.
+- Meaning:
+  - internal linkage begins now without needing CRM integration yet
+- Tradeoff:
+  - this is intentionally conservative and may miss fuzzy matches
+  - later CRM-aware flows can improve identity resolution
+
+## Runtime repository decision for phase 2
+
+- Runtime now uses D1-backed repositories when `env.DB` exists, and in-memory repositories only when no D1 binding is available.
+- Meaning:
+  - local `wrangler dev` and Cloudflare environments exercise real persistence paths
+  - unit tests can stay fast and deterministic without requiring a database boot
+- Tradeoff:
+  - D1 repository behavior is verified mainly through local migrations/dev runtime plus in-memory unit tests, not a full database integration suite yet
 
 ## Frontend approach decision
 
-- I used server-rendered HTML from the Worker instead of a heavy frontend framework.
+- I kept server-rendered HTML from the Worker instead of introducing a heavy frontend framework.
 - Reason:
-  - the phase goal is architectural foundation, not client-side application complexity
-  - an internal admin shell does not need SPA overhead yet
+  - the project focus is still on domain and persistence architecture
+  - the internal admin shell does not need SPA complexity yet
   - this keeps deployment, testing, and maintenance simpler
 - Tradeoff:
-  - interactive flows will eventually need either progressive enhancement or a dedicated frontend layer
-  - for now, the shell is intentionally restrained and static-first
+  - richer workflows will later need progressive enhancement or a dedicated frontend layer
 
 ## Folder structure decision
 
-- I kept route, middleware, domain, infrastructure, shared, and UI layers separate.
-- I grouped business interfaces under domain modules and mocks under infrastructure modules.
-- I included `infrastructure/db` now even though the runtime repository is in-memory, because phase 1 must prepare for D1-backed persistence next.
-- I did not mirror every requested folder one-to-one where it would create empty noise. For example:
-  - `domain/customers` currently contains the CRM provider interface
-  - `domain/invoices` currently contains the invoice provider interface
-  - `infrastructure/grow`, `infrastructure/invoices`, and `infrastructure/crm` contain current mocks
-
-## Runtime repository decision for phase 1
-
-- The running app currently uses an in-memory repository.
-- Reason:
-  - it allows the system to run immediately without real Cloudflare provisioning
-  - it avoids pretending that placeholder D1 credentials are production-ready
-  - it keeps the domain and provider boundaries testable today
-- Tradeoff:
-  - data is not durable yet
-  - the D1 migration files are planning artifacts until a real D1-backed repository is added
+- I preserved the phase 1 separation between route, middleware, domain, infrastructure, shared, and UI layers.
+- I added domain types and repositories for customers and webhook/invoice persistence concerns without collapsing them into route code.
+- I kept D1-specific logic in `infrastructure/db` and did not hardcode Cloudflare assumptions into domain files.

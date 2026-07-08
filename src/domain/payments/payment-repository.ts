@@ -1,10 +1,15 @@
+import type { PaymentStatus } from "./payment-status";
 import type {
-  CreatePaymentRequestInput,
+  CreatePaymentDraftInput,
   Payment,
   UpdatePaymentStatusInput
 } from "./payment-types";
+import type {
+  CreatePaymentWebhookInput,
+  PaymentWebhookRecord
+} from "./payment-webhook-types";
 
-export interface CreatePaymentRecordInput extends CreatePaymentRequestInput {
+export interface CreatePaymentRecordInput extends CreatePaymentDraftInput {
   id: string;
   status: Payment["status"];
   provider: string;
@@ -15,14 +20,60 @@ export interface CreatePaymentRecordInput extends CreatePaymentRequestInput {
   createdAt: string;
   updatedAt: string;
   paidAt?: string | null;
+  cancelledAt?: string | null;
+  failedAt?: string | null;
+}
+
+export interface AttachProviderPaymentDetailsInput {
+  paymentId: string;
+  status: PaymentStatus;
+  providerPaymentId: string;
+  providerTransactionId: string | null;
+  paymentUrl: string | null;
+  updatedAt: string;
+}
+
+export interface AttachInvoiceIdInput {
+  paymentId: string;
+  invoiceId: string;
+  updatedAt: string;
+}
+
+export interface PaymentListOptions {
+  limit?: number;
+  offset?: number;
+  status?: PaymentStatus;
+}
+
+export interface PaymentListResult {
+  items: Payment[];
+  limit: number;
+  offset: number;
+  hasMore: boolean;
 }
 
 export interface PaymentRepository {
   create(input: CreatePaymentRecordInput): Promise<Payment>;
-  updateStatus(input: UpdatePaymentStatusInput): Promise<Payment | null>;
   findById(id: string): Promise<Payment | null>;
   findByProviderTransactionId(
     providerTransactionId: string
   ): Promise<Payment | null>;
-  list(): Promise<Payment[]>;
+  updateStatus(input: UpdatePaymentStatusInput): Promise<Payment | null>;
+  attachProviderPaymentDetails(
+    input: AttachProviderPaymentDetailsInput
+  ): Promise<Payment | null>;
+  attachInvoiceId(input: AttachInvoiceIdInput): Promise<Payment | null>;
+  list(options?: PaymentListOptions): Promise<PaymentListResult>;
+  createWebhookRecord(
+    input: CreatePaymentWebhookInput
+  ): Promise<PaymentWebhookRecord>;
+  markWebhookProcessed(
+    webhookId: string,
+    processedAt: string
+  ): Promise<PaymentWebhookRecord | null>;
+  markWebhookFailed(
+    webhookId: string,
+    processingError: string,
+    processedAt: string
+  ): Promise<PaymentWebhookRecord | null>;
 }

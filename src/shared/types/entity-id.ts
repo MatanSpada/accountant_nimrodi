@@ -1,3 +1,7 @@
+import { randomUUID } from "node:crypto";
+
 export function createId(prefix: string) {
-  return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
+  const uuid = globalThis.crypto?.randomUUID?.() ?? randomUUID();
+
+  return `${prefix}_${uuid.replaceAll("-", "")}`;
 }
