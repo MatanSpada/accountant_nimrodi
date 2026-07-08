@@ -64,13 +64,19 @@ export function registerAdminRoutes(
       payment.id,
       10
     );
+    const invoice = await container.invoiceService.getInvoiceByPaymentId(
+      payment.id
+    );
 
     return c.html(
       renderPaymentDetailsPage({
         payment,
+        invoice,
         webhooks,
         simulatorMessage: c.req.query("simulator_message") ?? null,
-        simulatorOutcome: c.req.query("simulator_outcome") ?? null
+        simulatorOutcome: c.req.query("simulator_outcome") ?? null,
+        invoiceMessage: c.req.query("invoice_message") ?? null,
+        invoiceOutcome: c.req.query("invoice_outcome") ?? null
       })
     );
   });

@@ -2,22 +2,32 @@ import { describe, expect, it } from "vitest";
 
 import { PaymentService } from "../src/domain/payments/payment-service";
 import { PaymentWebhookService } from "../src/domain/payments/payment-webhook-service";
+import { InvoiceService } from "../src/domain/invoices/invoice-service";
 import { InMemoryPaymentRepository } from "../src/infrastructure/db/in-memory-payment-repository";
 import { InMemoryCustomerRepository } from "../src/infrastructure/db/in-memory-customer-repository";
 import { MockPaymentProvider } from "../src/infrastructure/grow/mock-payment-provider";
 import { parseMockGrowWebhookPayload } from "../src/infrastructure/grow/mock-grow-webhook-parser";
+import { InMemoryInvoiceRepository } from "../src/infrastructure/db/in-memory-invoice-repository";
+import { MockInvoiceProvider } from "../src/infrastructure/invoices/mock-invoice-provider";
 
 async function createServices() {
   const paymentRepository = new InMemoryPaymentRepository();
   const customerRepository = new InMemoryCustomerRepository();
+  const invoiceRepository = new InMemoryInvoiceRepository();
   const paymentService = new PaymentService({
     paymentRepository,
     customerRepository,
     paymentProvider: new MockPaymentProvider()
   });
+  const invoiceService = new InvoiceService({
+    paymentRepository,
+    invoiceRepository,
+    invoiceProvider: new MockInvoiceProvider()
+  });
   const paymentWebhookService = new PaymentWebhookService({
     paymentRepository,
-    parseMockGrowWebhookPayload
+    parseMockGrowWebhookPayload,
+    invoiceService
   });
   const payment = await paymentService.createPaymentRequest({
     customerName: "לקוח webhook",
@@ -30,6 +40,8 @@ async function createServices() {
 
   return {
     paymentRepository,
+    invoiceRepository,
+    invoiceService,
     paymentWebhookService,
     payment: payment!
   };
@@ -58,7 +70,8 @@ function createWebhookPayload(input: {
 
 describe("PaymentWebhookService", () => {
   it("updates a payment_created payment to paid", async () => {
-    const { paymentWebhookService, payment } = await createServices();
+    const { paymentWebhookService, payment, invoiceRepository } =
+      await createServices();
 
     const result = await paymentWebhookService.processMockGrowWebhook(
       createWebhookPayload({
@@ -72,6 +85,8 @@ describe("PaymentWebhookService", () => {
     expect(result.outcome).toBe("processed");
     expect(result.payment?.status).toBe("paid");
     expect(result.payment?.paidAt).toBe("2026-07-09T10:00:00.000Z");
+    expect(result.invoiceAttempt?.outcome).toBe("created");
+    expect(await invoiceRepository.findByPaymentId(payment.id)).not.toBeNull();
   });
 
   it("updates a pending payment to paid", async () => {
@@ -182,8 +197,12 @@ describe("PaymentWebhookService", () => {
   });
 
   it("does not process a duplicate event id twice", async () => {
-    const { paymentRepository, paymentWebhookService, payment } =
-      await createServices();
+    const {
+      paymentRepository,
+      paymentWebhookService,
+      payment,
+      invoiceRepository
+    } = await createServices();
     const payload = createWebhookPayload({
       eventId: "evt_duplicate",
       status: "paid",
@@ -200,6 +219,7 @@ describe("PaymentWebhookService", () => {
     expect(first.outcome).toBe("processed");
     expect(second.outcome).toBe("duplicate");
     expect(webhooks).toHaveLength(1);
+    expect(await invoiceRepository.findByPaymentId(payment.id)).not.toBeNull();
   });
 
   it("rejects invalid final-status transitions safely", async () => {
@@ -250,5 +270,24 @@ describe("PaymentWebhookService", () => {
     expect(result.webhook.rawPayload).toContain('"event_id":"evt_raw_payload"');
     expect(webhooks).toHaveLength(1);
     expect(webhooks[0]?.eventType).toBe("payment.paid");
+  });
+
+  it("does not create invoice for failed cancelled or expired statuses", async () => {
+    for (const status of ["failed", "cancelled", "expired"] as const) {
+      const { paymentWebhookService, payment, invoiceRepository } =
+        await createServices();
+
+      const result = await paymentWebhookService.processMockGrowWebhook(
+        createWebhookPayload({
+          eventId: `evt_no_invoice_${status}`,
+          status,
+          providerPaymentId: payment.providerPaymentId!,
+          providerTransactionId: payment.providerTransactionId!
+        })
+      );
+
+      expect(result.outcome).toBe("processed");
+      expect(await invoiceRepository.findByPaymentId(payment.id)).toBeNull();
+    }
   });
 });

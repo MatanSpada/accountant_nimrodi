@@ -5,7 +5,7 @@ export function registerHealthRoutes(app: Hono<{ Bindings: Env }>) {
     c.json({
       status: "ok",
       service: "accountant-nimrodi-payments",
-      phase: "4/8",
+      phase: "5/8",
       providerMode: "mocked"
     })
   );

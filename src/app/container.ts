@@ -10,12 +10,17 @@ import { D1PaymentRepository } from "../infrastructure/db/d1-payment-repository"
 import { D1CustomerRepository } from "../infrastructure/db/d1-customer-repository";
 import { PaymentWebhookService } from "../domain/payments/payment-webhook-service";
 import { parseMockGrowWebhookPayload } from "../infrastructure/grow/mock-grow-webhook-parser";
+import { InvoiceService } from "../domain/invoices/invoice-service";
+import type { InvoiceRepository } from "../domain/invoices/invoice-repository";
+import { D1InvoiceRepository } from "../infrastructure/db/d1-invoice-repository";
+import { InMemoryInvoiceRepository } from "../infrastructure/db/in-memory-invoice-repository";
 
 export function createContainer(
   env?: Env,
   overrides?: {
     paymentRepository?: PaymentRepository;
     customerRepository?: CustomerRepository;
+    invoiceRepository?: InvoiceRepository;
   }
 ) {
   const paymentRepository =
@@ -28,13 +33,24 @@ export function createContainer(
     (env?.DB
       ? new D1CustomerRepository(env.DB)
       : new InMemoryCustomerRepository());
+  const invoiceRepository =
+    overrides?.invoiceRepository ??
+    (env?.DB
+      ? new D1InvoiceRepository(env.DB)
+      : new InMemoryInvoiceRepository());
   const paymentProvider = new MockPaymentProvider();
   const invoiceProvider = new MockInvoiceProvider();
   const crmProvider = new MockCRMProvider();
+  const invoiceService = new InvoiceService({
+    paymentRepository,
+    invoiceRepository,
+    invoiceProvider
+  });
 
   return {
     paymentRepository,
     customerRepository,
+    invoiceRepository,
     paymentProvider,
     invoiceProvider,
     crmProvider,
@@ -43,9 +59,11 @@ export function createContainer(
       customerRepository,
       paymentProvider
     }),
+    invoiceService,
     paymentWebhookService: new PaymentWebhookService({
       paymentRepository,
-      parseMockGrowWebhookPayload
+      parseMockGrowWebhookPayload,
+      invoiceService
     })
   };
 }

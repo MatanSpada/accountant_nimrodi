@@ -9,6 +9,10 @@ import {
   isIdempotentFinalStatusMatch
 } from "./payment-webhook-validation";
 import type { ParsedMockGrowWebhook } from "../../infrastructure/grow/mock-grow-webhook-parser";
+import type {
+  InvoiceAttemptResult,
+  InvoiceService
+} from "../invoices/invoice-service";
 
 export type ProcessMockWebhookResult =
   | {
@@ -17,6 +21,7 @@ export type ProcessMockWebhookResult =
       webhook: PaymentWebhookRecord;
       duplicate: false;
       message: string;
+      invoiceAttempt?: InvoiceAttemptResult;
     }
   | {
       outcome: "duplicate";
@@ -24,6 +29,7 @@ export type ProcessMockWebhookResult =
       webhook: PaymentWebhookRecord;
       duplicate: true;
       message: string;
+      invoiceAttempt?: undefined;
     }
   | {
       outcome: "failed";
@@ -31,6 +37,7 @@ export type ProcessMockWebhookResult =
       webhook: PaymentWebhookRecord;
       duplicate: false;
       message: string;
+      invoiceAttempt?: InvoiceAttemptResult;
     };
 
 export class PaymentWebhookService {
@@ -38,6 +45,7 @@ export class PaymentWebhookService {
     private readonly dependencies: {
       paymentRepository: PaymentRepository;
       parseMockGrowWebhookPayload: (payload: unknown) => ParsedMockGrowWebhook;
+      invoiceService: InvoiceService;
     }
   ) {}
 
@@ -127,12 +135,39 @@ export class PaymentWebhookService {
           new Date().toISOString()
         );
 
+      let invoiceAttempt: InvoiceAttemptResult | undefined;
+      let message = "ה-webhook עובד בהצלחה וסטטוס התשלום עודכן.";
+      let responsePayment = updatedPayment;
+
+      if (updatedPayment.status === "paid") {
+        try {
+          invoiceAttempt =
+            await this.dependencies.invoiceService.ensureInvoiceForPaymentRecord(
+              updatedPayment
+            );
+          responsePayment =
+            invoiceAttempt.outcome === "failed"
+              ? updatedPayment
+              : invoiceAttempt.payment;
+          message =
+            invoiceAttempt.outcome === "failed"
+              ? "התשלום סומן כשולם, אך יצירת הקבלה המדומה נכשלה."
+              : "ה-webhook עובד בהצלחה, סטטוס התשלום עודכן, וטופלה יצירת קבלה מדומה.";
+        } catch (error) {
+          message =
+            error instanceof AppError
+              ? `התשלום סומן כשולם, אך יצירת הקבלה נתקלה בשגיאה: ${error.message}`
+              : "התשלום סומן כשולם, אך יצירת הקבלה נתקלה בשגיאה לא ידועה.";
+        }
+      }
+
       return {
         outcome: "processed",
-        payment: updatedPayment,
+        payment: responsePayment,
         webhook: processed ?? webhook,
         duplicate: false,
-        message: "ה-webhook עובד בהצלחה וסטטוס התשלום עודכן."
+        message,
+        invoiceAttempt
       };
     } catch (error) {
       const message =

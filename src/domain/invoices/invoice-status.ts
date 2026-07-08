@@ -1,6 +1,6 @@
 export const INVOICE_STATUSES = [
-  "draft",
-  "issued",
+  "pending",
+  "created",
   "failed",
   "cancelled"
 ] as const;

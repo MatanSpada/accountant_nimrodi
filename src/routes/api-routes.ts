@@ -33,6 +33,25 @@ export function registerApiRoutes(
     return c.json({ payment });
   });
 
+  app.post("/api/payments/:id/invoice/mock", async (c) => {
+    const container = getContainer(c.env);
+    const result = await container.invoiceService
+      .ensureInvoiceForPaidPayment(c.req.param("id"))
+      .catch((error) => {
+        if (error instanceof AppError) {
+          return c.json({ error: error.message }, error.statusCode);
+        }
+
+        throw error;
+      });
+
+    if (result instanceof Response) {
+      return result;
+    }
+
+    return c.json(result, result.outcome === "created" ? 201 : 200);
+  });
+
   app.post("/api/payments", async (c) => {
     const container = getContainer(c.env);
     const body = await c.req.json().catch(() => {

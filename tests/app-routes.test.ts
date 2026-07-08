@@ -4,13 +4,16 @@ import { createApp } from "../src/app/create-app";
 import { createContainer } from "../src/app/container";
 import { InMemoryCustomerRepository } from "../src/infrastructure/db/in-memory-customer-repository";
 import { InMemoryPaymentRepository } from "../src/infrastructure/db/in-memory-payment-repository";
+import { InMemoryInvoiceRepository } from "../src/infrastructure/db/in-memory-invoice-repository";
 
 function createTestApp() {
   const paymentRepository = new InMemoryPaymentRepository();
   const customerRepository = new InMemoryCustomerRepository();
+  const invoiceRepository = new InMemoryInvoiceRepository();
   const container = createContainer(undefined, {
     paymentRepository,
-    customerRepository
+    customerRepository,
+    invoiceRepository
   });
 
   const app = createApp({
@@ -110,10 +113,13 @@ describe("app routes", () => {
     expect(webhookResponse.status).toBe(200);
     const webhookResult = (await webhookResponse.json()) as {
       outcome: string;
-      payment: { status: string };
+      payment: { status: string; invoiceId: string | null };
+      invoiceAttempt: { outcome: string; invoice: { invoiceUrl: string } };
     };
     expect(webhookResult.outcome).toBe("processed");
     expect(webhookResult.payment.status).toBe("paid");
+    expect(webhookResult.payment.invoiceId).toBeTruthy();
+    expect(webhookResult.invoiceAttempt.outcome).toBe("created");
 
     const duplicateResponse = await app.request("/api/mock-grow/webhook", {
       method: "POST",
@@ -129,6 +135,14 @@ describe("app routes", () => {
     };
     expect(duplicateResult.outcome).toBe("duplicate");
     expect(duplicateResult.duplicate).toBe(true);
+
+    const detailAfterWebhook = await app.request(
+      `/api/payments/${createPayload.payment.id}`
+    );
+    const detailAfterWebhookPayload = (await detailAfterWebhook.json()) as {
+      payment: { invoiceId: string | null };
+    };
+    expect(detailAfterWebhookPayload.payment.invoiceId).toBeTruthy();
 
     const growWebhookResponse = await app.request("/api/grow/webhook", {
       method: "POST",
@@ -184,6 +198,7 @@ describe("app routes", () => {
     expect(detailHtml).toContain("העתקת קישור");
     expect(detailHtml).toContain("סימולטור פיתוח — לא GROW אמיתי");
     expect(detailHtml).toContain("/api/mock-grow/webhook");
+    expect(detailHtml).toContain("קבלה / מסמך");
 
     const paymentApiResponse = await app.request(
       `/api/payments/${createPayload.payment.id}`
@@ -205,5 +220,62 @@ describe("app routes", () => {
     );
     expect(settingsPage.status).toBe(200);
     expect(await settingsPage.text()).toContain("GROW userId");
+  });
+
+  it("creates a mock invoice manually only for paid payments and serves mock invoice page", async () => {
+    const { app, container } = createTestApp();
+
+    const createResponse = await app.request("/api/payments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        customer_name: "לקוח חשבונית",
+        customer_phone: "0500000099",
+        customer_email: "invoice-route@example.com",
+        amount_shekel: "640.00",
+        description: "בדיקת מסמך ידני"
+      })
+    });
+    const createPayload = (await createResponse.json()) as {
+      payment: { id: string };
+    };
+
+    const rejected = await app.request(
+      `/api/payments/${createPayload.payment.id}/invoice/mock`,
+      {
+        method: "POST"
+      }
+    );
+    expect(rejected.status).toBe(422);
+
+    await container.paymentRepository.updateStatus({
+      paymentId: createPayload.payment.id,
+      status: "paid",
+      updatedAt: "2026-07-09T12:00:00.000Z",
+      paidAt: "2026-07-09T12:00:00.000Z"
+    });
+
+    const createInvoiceResponse = await app.request(
+      `/api/payments/${createPayload.payment.id}/invoice/mock`,
+      {
+        method: "POST"
+      }
+    );
+    expect(createInvoiceResponse.status).toBe(201);
+    const invoicePayload = (await createInvoiceResponse.json()) as {
+      outcome: string;
+      invoice: { providerInvoiceId: string; invoiceUrl: string };
+    };
+    expect(invoicePayload.outcome).toBe("created");
+
+    const mockInvoicePage = await app.request(
+      `/dev/mock-invoices/${invoicePayload.invoice.providerInvoiceId}`
+    );
+    expect(mockInvoicePage.status).toBe(200);
+    expect(await mockInvoicePage.text()).toContain(
+      "מסמך מדומה — לצורכי פיתוח בלבד"
+    );
   });
 });

@@ -2,7 +2,10 @@ import type { Hono } from "hono";
 
 import type { AppContainer } from "../app/container";
 import { AppError } from "../shared/errors/app-error";
-import { renderMockGrowPaymentPage } from "../ui/admin/admin-page";
+import {
+  renderMockGrowPaymentPage,
+  renderMockInvoicePage
+} from "../ui/admin/admin-page";
 
 export function registerWebhookRoutes(
   app: Hono<{ Bindings: Env }>,
@@ -53,5 +56,27 @@ export function registerWebhookRoutes(
         webhooks
       })
     );
+  });
+
+  app.get("/dev/mock-invoices/:invoiceId", async (c) => {
+    const container = getContainer(c.env);
+    const invoice =
+      await container.invoiceService.getInvoiceByProviderInvoiceId(
+        c.req.param("invoiceId")
+      );
+
+    if (!invoice) {
+      throw new AppError("המסמך המדומה לא נמצא.", 404);
+    }
+
+    const payment = await container.paymentService.getPaymentById(
+      invoice.paymentId
+    );
+
+    if (!payment) {
+      throw new AppError("התשלום המשויך למסמך המדומה לא נמצא.", 404);
+    }
+
+    return c.html(renderMockInvoicePage({ invoice, payment }));
   });
 }

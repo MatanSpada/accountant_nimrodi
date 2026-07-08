@@ -209,3 +209,60 @@
   - the office flow and the customer-side simulation can both be tested without leaving the app
 - Tradeoff:
   - the stored URL is intentionally local-development-oriented and not shareable as a real external payment link
+
+## Why invoice creation is provider-based
+
+- Invoice creation now goes through an `InvoiceProvider` interface instead of being hardcoded inside the webhook service.
+- Meaning:
+  - the system can later swap between GROW-issued documents and an external provider without rewriting payment business rules
+  - provider-specific payloads remain isolated in `infrastructure/invoices`
+- Tradeoff:
+  - there is one more abstraction layer to maintain
+
+## Why invoice creation is triggered from the paid webhook flow
+
+- The business event that matters is a payment becoming `paid`, not a user opening the payment page.
+- Meaning:
+  - invoice creation follows the same source-of-truth event that production will rely on later
+  - duplicate paid webhook handling can also protect against duplicate invoices
+- Tradeoff:
+  - invoice creation now depends on the webhook-processing orchestration path instead of a simpler UI-only action
+
+## Duplicate invoice prevention strategy
+
+- The invoice service checks for an existing invoice by `payment_id` before creating a new one.
+- The database also enforces uniqueness on `invoices.payment_id`.
+- Meaning:
+  - duplicate webhooks and repeated manual retry attempts cannot create a second receipt for the same payment
+- Tradeoff:
+  - retries reuse the same invoice row instead of storing many invoice attempts as separate records
+
+## Why payment remains paid if invoice creation fails
+
+- Payment state and invoice state are intentionally separated.
+- Meaning:
+  - the system does not falsely "unpay" a successful payment just because downstream document generation failed
+  - support staff can retry invoice generation later without corrupting payment history
+- Tradeoff:
+  - the UI must show that payment and invoice can temporarily diverge
+
+## Invoice schema decision
+
+- I added a follow-up migration instead of rewriting the original invoice table definition.
+- The migration adds:
+  - `failure_reason`
+  - a unique index on `payment_id`
+  - a unique provider invoice index
+- Meaning:
+  - local environments that already applied phase 4 migrations can evolve forward cleanly
+- Tradeoff:
+  - the schema now spans multiple migration files even though the project is still early
+
+## Why the mock invoice page is not a legal document
+
+- The mock invoice page exists only to verify orchestration and stored data during development.
+- Meaning:
+  - the office can confirm that invoice creation happened and inspect the generated values
+  - nobody should confuse the page with a valid accounting receipt
+- Tradeoff:
+  - the mock page intentionally looks functional but must still be clearly labeled as development-only

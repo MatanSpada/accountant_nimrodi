@@ -9,6 +9,19 @@ export interface InvoiceRecord {
   invoiceUrl: string | null;
   status: InvoiceStatus;
   rawPayload: string | null;
+  failureReason: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateInvoiceInput {
+  paymentId: string;
+  customerName: string;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  amountAgorot: number;
+  currency: string;
+  description: string;
+  providerPaymentId: string | null;
+  providerTransactionId: string | null;
 }

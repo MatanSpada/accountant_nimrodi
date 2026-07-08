@@ -1,6 +1,6 @@
 # מערכת תשלומים פנימית — נמרודי ושות׳
 
-Phase 4 of an internal payment-request system for "נמרודי ושות׳ – רואי חשבון".
+Phase 5 of an internal payment-request system for "נמרודי ושות׳ – רואי חשבון".
 
 The long-term business flow is:
 
@@ -8,14 +8,14 @@ The long-term business flow is:
 2. The system creates a provider payment request and returns a payment link.
 3. The office manually sends the link to the customer.
 4. Webhooks later update the payment status.
-5. Receipt / invoice logic is added in a later phase.
+5. A receipt / invoice attempt is triggered after a paid webhook.
 
-This phase still does **not** connect to real GROW. It adds a mock webhook processing flow on top of the existing internal admin flow and the D1-backed persistence layer.
+This phase still does **not** connect to real GROW invoices or any real external invoice provider. It adds a mock invoice orchestration flow on top of the existing mock webhook processing and D1-backed persistence layer.
 
 ## Current phase status
 
 - Cloudflare Workers + Hono foundation is active.
-- D1-backed repositories persist customers, payments, and webhook records.
+- D1-backed repositories persist customers, payments, webhook records, and invoice records.
 - Internal admin UI now supports:
   - dashboard
   - new payment form
@@ -24,8 +24,12 @@ This phase still does **not** connect to real GROW. It adds a mock webhook proce
   - client requirements page
 - A user can create a mock payment link from the admin UI, copy it, and open a manual WhatsApp link.
 - A user can simulate `paid`, `failed`, `cancelled`, and `expired` webhook outcomes from the admin UI or the mock payment page.
+- A successful `paid` webhook now triggers exactly one mock invoice attempt.
+- Duplicate paid webhook delivery does not create a second invoice.
+- A paid payment stays `paid` even if mock invoice creation fails.
 - Payment list and payment details pages read from the repository layer.
 - Incoming mock webhook payloads are stored raw in `payment_webhooks`, validated against the payment, and processed idempotently by `event_id`.
+- Mock invoice provider responses are stored raw in `invoices.raw_payload`.
 - No authentication yet.
 - No real GROW integration yet.
 - `/api/grow/webhook` is intentionally reserved and returns `501 Not Implemented` until verified real GROW payloads are available.
@@ -63,8 +67,8 @@ Final payment statuses:
 
 ### Invoice statuses
 
-- `draft`
-- `issued`
+- `pending`: invoice attempt was opened but not completed yet.
+- `created`: mock receipt was created successfully.
 - `failed`
 - `cancelled`
 
@@ -74,7 +78,7 @@ Final payment statuses:
 - `processed`
 - `failed`
 
-## Mock webhook flow in phase 4
+## Mock webhook and invoice flow in phase 5
 
 1. Create a payment from `/admin/payments/new`
 2. Open the payment details page or the mock payment URL
@@ -85,8 +89,10 @@ Final payment statuses:
    - finds the matching payment by provider identifiers
    - validates amount, currency, and allowed status transition
    - updates the payment if valid
+   - if the new payment status is `paid`, attempts invoice creation through the invoice service
    - marks the webhook as `processed` or `failed`
 6. If the same `event_id` is sent again, the webhook is treated as a duplicate and is not processed twice
+7. If invoice creation fails, the payment still stays `paid` and the invoice row is marked `failed`
 
 ## Database schema overview
 
@@ -110,8 +116,10 @@ Final payment statuses:
 
 ### `invoices`
 
-- stores invoice linkage and raw provider payload text
-- currently schema-only in this phase
+- stores one invoice orchestration row per payment
+- stores raw provider payload text
+- stores invoice failure reason when the provider attempt fails
+- uses a unique payment constraint so duplicate invoices are blocked at the database layer too
 
 ## Installation
 
@@ -141,6 +149,7 @@ http://127.0.0.1:8787
 - Payments list: `http://127.0.0.1:8787/admin/payments`
 - Payment details: `http://127.0.0.1:8787/admin/payments/<PAYMENT_ID>`
 - Mock payment page: `http://127.0.0.1:8787/dev/mock-grow/pay/<PROVIDER_PAYMENT_ID>`
+- Mock invoice page: `http://127.0.0.1:8787/dev/mock-invoices/<PROVIDER_INVOICE_ID>`
 - Client requirements: `http://127.0.0.1:8787/admin/settings/client-requirements`
 
 ## Internal API examples
@@ -197,6 +206,12 @@ curl -X POST http://127.0.0.1:8787/api/grow/webhook \
   -d '{}'
 ```
 
+Retry mock invoice creation manually for a paid payment:
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/payments/<PAYMENT_ID>/invoice/mock
+```
+
 Health check:
 
 ```bash
@@ -221,10 +236,13 @@ curl http://127.0.0.1:8787/health
    - WhatsApp link button
 8. Click `סימולציה: שולם`
 9. Confirm the status changes to `שולם`
-10. Confirm a webhook record appears in the payment details page
-11. POST the same `event_id` again to `/api/mock-grow/webhook` and confirm the response is duplicate-safe
-12. Open `/admin/payments`
-13. Confirm the created payment appears in the list with the updated status
+10. Confirm exactly one mock invoice is created automatically
+11. Confirm the payment details page shows the invoice section and mock invoice link
+12. Open the mock invoice page and confirm it is clearly labeled `מסמך מדומה — לצורכי פיתוח בלבד`
+13. POST the same `event_id` again to `/api/mock-grow/webhook` and confirm the response is duplicate-safe and no second invoice is created
+14. Create another payment and simulate `failed`, `cancelled`, and `expired`
+15. Confirm no invoice is created for those statuses
+16. Use `POST /api/payments/<PAYMENT_ID>/invoice/mock` only on a paid payment when manual retry is needed
 
 ## Tests
 
@@ -272,6 +290,8 @@ Notes:
 - Payment-provider request creation
 - Payment-provider webhook payload schema
 - Payment-provider hosted payment page
+- Invoice-provider creation
+- Invoice-provider hosted document page
 - WhatsApp sending itself
 - Invoice creation
 - CRM integration
@@ -282,6 +302,21 @@ The local mock webhook schema is a development simulator only. It is **not** a v
 
 - Real GROW sandbox or production payload examples have not been provided by the client.
 - The parser must be implemented only after verifying the real fields, signature behavior, and status semantics from the client-owned GROW account.
+
+## What is required before real invoice integration
+
+- The client must decide whether receipts/invoices come from:
+  - GROW
+  - an existing external invoice provider
+- If an external invoice provider is used, the client must provide:
+  - provider name
+  - API documentation
+  - API credentials
+  - sandbox details if available
+  - required document type, as instructed by the client/accountant
+  - required VAT / tax behavior, as instructed by the client/accountant
+
+This repo does not give accounting or legal advice. The final document type must be confirmed by the client/accountant.
 
 ## Verified commands
 

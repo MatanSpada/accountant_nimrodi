@@ -1,9 +1,11 @@
+import type { InvoiceRecord } from "../../domain/invoices/invoice-types";
 import type { PaymentListResult } from "../../domain/payments/payment-repository";
 import { isFinalPaymentStatus } from "../../domain/payments/payment-status";
 import type { Payment } from "../../domain/payments/payment-types";
 import type { PaymentWebhookRecord } from "../../domain/payments/payment-webhook-types";
 import { CLIENT_REQUIREMENTS_ITEMS } from "./client-requirements";
 import { escapeHtml, formatAmountAgorot, formatDateTime } from "./formatters";
+import { getInvoiceStatusLabel } from "./invoice-status-labels";
 import { getPaymentStatusLabel } from "./status-labels";
 import { buildWhatsAppLink } from "./whatsapp-helper";
 
@@ -352,7 +354,7 @@ function renderLayout(input: {
               .join("")}
           </nav>
           <div class="sidebar-note">
-            שלב 4 עדיין עובד עם provider מדומה בלבד. כעת אפשר גם לדמות webhook נכנס ולבדוק עדכון סטטוס idempotent בלי GROW אמיתי.
+            שלב 5 עדיין עובד עם providers מדומים בלבד. תשלום ששולם יכול כעת להפעיל גם יצירת קבלה מדומה, בלי להתחבר עדיין ל-GROW או לספק מסמכים אמיתי.
           </div>
         </aside>
         <main>
@@ -393,43 +395,75 @@ function renderLayout(input: {
         document.addEventListener("submit", async (event) => {
           const target = event.target;
           if (!(target instanceof HTMLFormElement)) return;
-          if (!target.hasAttribute("data-mock-webhook-form")) return;
+          if (
+            !target.hasAttribute("data-mock-webhook-form") &&
+            !target.hasAttribute("data-mock-invoice-form")
+          ) {
+            return;
+          }
 
           event.preventDefault();
 
-          const formData = new FormData(target);
-          const payload = Object.fromEntries(formData.entries());
-          payload.amount_agorot = Number(payload.amount_agorot);
-          payload.occurred_at = new Date().toISOString();
-
           try {
-            const response = await fetch("/api/mock-grow/webhook", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify(payload)
-            });
+            let query;
+            if (target.hasAttribute("data-mock-webhook-form")) {
+              const formData = new FormData(target);
+              const payload = Object.fromEntries(formData.entries());
+              payload.amount_agorot = Number(payload.amount_agorot);
+              payload.occurred_at = new Date().toISOString();
 
-            const data = await response.json();
+              const response = await fetch("/api/mock-grow/webhook", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(payload)
+              });
+              const data = await response.json();
+
+              query = new URLSearchParams({
+                simulator_outcome: String(data.outcome || "failed"),
+                simulator_message: String(
+                  data.message || "סימולציית ה-webhook הסתיימה."
+                )
+              });
+            } else {
+              const endpoint = target.getAttribute("data-endpoint");
+              if (!endpoint) {
+                throw new Error("חסר endpoint ליצירת קבלה מדומה.");
+              }
+
+              const response = await fetch(endpoint, {
+                method: "POST"
+              });
+              const data = await response.json();
+
+              query = new URLSearchParams({
+                invoice_outcome: String(data.outcome || "failed"),
+                invoice_message: String(
+                  data.message || "ניסיון יצירת הקבלה הסתיים."
+                )
+              });
+            }
+
             const redirectBase =
               target.getAttribute("data-redirect") || window.location.pathname;
-            const query = new URLSearchParams({
-              simulator_outcome: String(data.outcome || "failed"),
-              simulator_message: String(
-                data.message || "סימולציית ה-webhook הסתיימה."
-              )
-            });
 
             window.location.href = redirectBase + "?" + query.toString();
           } catch (error) {
             const message =
               error instanceof Error
                 ? error.message
-                : "לא ניתן היה לשלוח את ה-webhook המדומה.";
+                : target.hasAttribute("data-mock-webhook-form")
+                  ? "לא ניתן היה לשלוח את ה-webhook המדומה."
+                  : "לא ניתן היה ליצור קבלה מדומה.";
             const redirectBase =
               target.getAttribute("data-redirect") || window.location.pathname;
             const query = new URLSearchParams({
-              simulator_outcome: "failed",
-              simulator_message: message
+              [target.hasAttribute("data-mock-webhook-form")
+                ? "simulator_outcome"
+                : "invoice_outcome"]: "failed",
+              [target.hasAttribute("data-mock-webhook-form")
+                ? "simulator_message"
+                : "invoice_message"]: message
             });
             window.location.href = redirectBase + "?" + query.toString();
           }
@@ -522,11 +556,69 @@ function renderWebhookRecords(webhooks: PaymentWebhookRecord[]) {
   `;
 }
 
+function renderInvoiceIndicator(payment: Payment) {
+  return payment.invoiceId ? "קבלה נוצרה" : "אין קבלה";
+}
+
+function renderInvoiceSection(input: {
+  payment: Payment;
+  invoice: InvoiceRecord | null;
+}) {
+  if (!input.invoice) {
+    return `
+      <p>לא נוצרה קבלה עדיין.</p>
+      ${
+        input.payment.status === "paid"
+          ? `
+            <form method="post" data-mock-invoice-form data-endpoint="/api/payments/${escapeHtml(input.payment.id)}/invoice/mock" data-redirect="/admin/payments/${escapeHtml(input.payment.id)}">
+              <button type="submit">צור/נסה שוב קבלה מדומה</button>
+            </form>
+            <div class="note">פעולת retry זמינה רק לצורכי פיתוח ואינה מייצגת flow production סופי.</div>
+          `
+          : ""
+      }
+    `;
+  }
+
+  const canRetry =
+    input.payment.status === "paid" &&
+    (input.invoice.status === "failed" || input.invoice.status === "pending");
+
+  return `
+    <div class="details-grid">
+      <div class="detail"><strong>סטטוס קבלה</strong>${getInvoiceStatusLabel(input.invoice.status)}</div>
+      <div class="detail"><strong>Provider</strong>${escapeHtml(input.invoice.provider)}</div>
+      <div class="detail"><strong>מספר מסמך</strong>${escapeHtml(input.invoice.invoiceNumber ?? "—")}</div>
+      <div class="detail"><strong>Provider Invoice ID</strong>${escapeHtml(input.invoice.providerInvoiceId ?? "—")}</div>
+      <div class="detail"><strong>קישור למסמך</strong>${
+        input.invoice.invoiceUrl
+          ? `<a href="${escapeHtml(input.invoice.invoiceUrl)}" target="_blank" rel="noreferrer">פתיחת מסמך מדומה</a>`
+          : "—"
+      }</div>
+      <div class="detail"><strong>נוצר בתאריך</strong>${formatDateTime(input.invoice.createdAt)}</div>
+      <div class="detail"><strong>עודכן בתאריך</strong>${formatDateTime(input.invoice.updatedAt)}</div>
+      <div class="detail"><strong>שגיאה אחרונה</strong>${escapeHtml(input.invoice.failureReason ?? "—")}</div>
+    </div>
+    ${
+      canRetry
+        ? `
+          <div class="button-row">
+            <form method="post" data-mock-invoice-form data-endpoint="/api/payments/${escapeHtml(input.payment.id)}/invoice/mock" data-redirect="/admin/payments/${escapeHtml(input.payment.id)}">
+              <button type="submit">צור/נסה שוב קבלה מדומה</button>
+            </form>
+          </div>
+          <div class="note">המערכת תשאיר את התשלום במצב שולם גם אם הניסיון הבא ליצירת קבלה ייכשל.</div>
+        `
+        : ""
+    }
+  `;
+}
+
 function renderPaymentRows(payments: Payment[]) {
   if (payments.length === 0) {
     return `
       <tr>
-        <td colspan="7">
+        <td colspan="8">
           <div class="empty-state">עדיין לא נוצרו בקשות תשלום. אפשר להתחיל מיצירת בקשה חדשה.</div>
         </td>
       </tr>
@@ -542,6 +634,7 @@ function renderPaymentRows(payments: Payment[]) {
           <td>${escapeHtml(payment.customerPhone ?? "—")}</td>
           <td>${formatAmountAgorot(payment.amountAgorot)}</td>
           <td><span class="status-badge">${getPaymentStatusLabel(payment.status)}</span></td>
+          <td>${renderInvoiceIndicator(payment)}</td>
           <td>${
             payment.paymentUrl
               ? `<a href="${escapeHtml(payment.paymentUrl)}" target="_blank" rel="noreferrer">פתיחת קישור</a>`
@@ -612,6 +705,7 @@ export function renderDashboardPage(input: { payments: Payment[] }) {
               <th>טלפון</th>
               <th>סכום</th>
               <th>סטטוס</th>
+              <th>קבלה</th>
               <th>קישור</th>
               <th>פעולה</th>
             </tr>
@@ -743,6 +837,7 @@ export function renderPaymentsListPage(input: { payments: PaymentListResult }) {
               <th>טלפון</th>
               <th>סכום</th>
               <th>סטטוס</th>
+              <th>קבלה</th>
               <th>קישור</th>
               <th>פעולה</th>
             </tr>
@@ -769,9 +864,12 @@ export function renderPaymentsListPage(input: { payments: PaymentListResult }) {
 
 export function renderPaymentDetailsPage(input: {
   payment: Payment;
+  invoice: InvoiceRecord | null;
   webhooks: PaymentWebhookRecord[];
   simulatorMessage?: string | null;
   simulatorOutcome?: string | null;
+  invoiceMessage?: string | null;
+  invoiceOutcome?: string | null;
 }) {
   const whatsappLink = buildWhatsAppLink({
     customerName: input.payment.customerName,
@@ -799,6 +897,15 @@ export function renderPaymentDetailsPage(input: {
                 : input.simulatorOutcome === "duplicate"
                   ? `<div class="warning-box">${escapeHtml(input.simulatorMessage)}</div>`
                   : `<div class="success-box">${escapeHtml(input.simulatorMessage)}</div>`
+              : ""
+          }
+          ${
+            input.invoiceMessage
+              ? input.invoiceOutcome === "failed"
+                ? `<div class="error-box">${escapeHtml(input.invoiceMessage)}</div>`
+                : input.invoiceOutcome === "existing"
+                  ? `<div class="warning-box">${escapeHtml(input.invoiceMessage)}</div>`
+                  : `<div class="success-box">${escapeHtml(input.invoiceMessage)}</div>`
               : ""
           }
           <h3>${escapeHtml(input.payment.customerName)}</h3>
@@ -856,6 +963,14 @@ export function renderPaymentDetailsPage(input: {
           <div class="note">אין כאן schema אמיתי של GROW. המימוש הסופי יתבצע רק לאחר קבלת payloads מאומתים מהחשבון של הלקוח.</div>
         </section>
         <section class="card">
+          <h3>קבלה / מסמך</h3>
+          <p>כאשר התשלום מסומן כשולם, המערכת מנסה ליצור מסמך מדומה בדיוק פעם אחת. duplicate webhook לא אמור ליצור מסמך נוסף.</p>
+          ${renderInvoiceSection({
+            payment: input.payment,
+            invoice: input.invoice
+          })}
+        </section>
+        <section class="card">
           <h3>Webhook-ים אחרונים</h3>
           <p>תצוגת audit פשוטה של אירועי webhook שנשמרו עבור העסקה הזאת.</p>
           ${renderWebhookRecords(input.webhooks)}
@@ -905,6 +1020,41 @@ export function renderMockGrowPaymentPage(input: {
           </div>
         </section>
       </div>
+    `
+  });
+}
+
+export function renderMockInvoicePage(input: {
+  invoice: InvoiceRecord;
+  payment: Payment;
+}) {
+  return renderLayout({
+    title: `מסמך מדומה ${input.invoice.invoiceNumber ?? input.invoice.id} — נמרודי ושות׳`,
+    activePath: "payments",
+    pageTitle: "מסמך מדומה",
+    content: `
+      <section class="hero">
+        <h2>מסמך מדומה — לצורכי פיתוח בלבד</h2>
+        <p>העמוד הזה אינו מסמך חשבונאי או משפטי. הוא קיים רק כדי לאמת את זרימת הפיתוח של יצירת קבלה לאחר תשלום.</p>
+      </section>
+      <section class="card">
+        <h3>${escapeHtml(input.invoice.invoiceNumber ?? input.invoice.id)}</h3>
+        <p><span class="status-badge">${getInvoiceStatusLabel(input.invoice.status)}</span></p>
+        <div class="details-grid">
+          <div class="detail"><strong>Payment ID</strong>${escapeHtml(input.payment.id)}</div>
+          <div class="detail"><strong>Provider Invoice ID</strong>${escapeHtml(input.invoice.providerInvoiceId ?? "—")}</div>
+          <div class="detail"><strong>לקוח</strong>${escapeHtml(input.payment.customerName)}</div>
+          <div class="detail"><strong>סכום</strong>${formatAmountAgorot(input.payment.amountAgorot)}</div>
+          <div class="detail"><strong>תיאור</strong>${escapeHtml(input.payment.description)}</div>
+          <div class="detail"><strong>סטטוס</strong>${getInvoiceStatusLabel(input.invoice.status)}</div>
+          <div class="detail"><strong>נוצר בתאריך</strong>${formatDateTime(input.invoice.createdAt)}</div>
+          <div class="detail"><strong>עודכן בתאריך</strong>${formatDateTime(input.invoice.updatedAt)}</div>
+        </div>
+        <div class="note">סוג המסמך הסופי, התנהגות המע״מ והפורמט החוקי יוגדרו רק לאחר קבלת הנחיות מהלקוח ומהרואה חשבון.</div>
+        <div class="button-row">
+          <a class="button secondary" href="/admin/payments/${escapeHtml(input.payment.id)}">חזרה לפרטי העסקה</a>
+        </div>
+      </section>
     `
   });
 }
