@@ -192,6 +192,58 @@ npx wrangler secret put SESSION_SECRET --env staging
 npx wrangler deploy --env staging
 ```
 
+## CI/CD
+
+GitHub Actions currently runs one workflow for both verification and staging deployment:
+
+- On every `pull_request`: run verification only.
+- On every push to `master`: run verification, then deploy staging only if verification passed.
+
+Verification steps in CI:
+
+- `npm ci` when `package-lock.json` exists, otherwise `npm install`
+- `npm run cf-typegen`
+- `npm run format:check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+
+Automatic staging deployment runs only on push to `master` and uses:
+
+```bash
+npx wrangler d1 migrations apply accountant-nimrodi --remote --env staging
+npx wrangler deploy --env staging
+```
+
+Note:
+
+- The current project uses `wrangler@3.114.17`.
+- `wrangler d1 migrations apply` in this version does not expose a `--yes` flag.
+- The workflow therefore uses the exact non-interactive staging command that is already working manually.
+
+Required GitHub Actions secrets:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+
+Cloudflare Worker secrets stay in Cloudflare and are not stored in GitHub Actions:
+
+- `ADMIN_PASSWORD`
+- `SESSION_SECRET`
+
+To rotate the admin password later:
+
+```bash
+npx wrangler secret put ADMIN_PASSWORD --env staging
+```
+
+To review deployment status:
+
+1. Open the GitHub repository.
+2. Open the `Actions` tab.
+3. Open the latest `CI` run.
+4. Check the `verify` job and then the `Deploy staging` job.
+
 See [DEPLOYMENT_CHECKLIST.md](/home/matan/Documents/accountant_nimrodi/DEPLOYMENT_CHECKLIST.md) for the full checklist.
 
 ## Operations and data ownership

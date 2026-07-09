@@ -52,6 +52,33 @@
 11. Disable dev tools for production
 12. Verify `/api/grow/webhook` is reachable
 
+## GitHub Actions deployment flow
+
+- CI runs on every `pull_request`.
+- CI also runs on every push to `master`.
+- Automatic staging deployment runs only on push to `master`.
+- The staging deploy job depends on CI passing first.
+- No staging deployment runs from pull requests.
+- No staging deployment runs if `CLOUDFLARE_ACCOUNT_ID` or `CLOUDFLARE_API_TOKEN` is missing.
+
+GitHub Actions secrets required for staging deploy:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+
+Cloudflare Worker secrets remain stored in Cloudflare itself:
+
+- `ADMIN_PASSWORD`
+- `SESSION_SECRET`
+
+To inspect deployment status:
+
+1. Open the repository in GitHub.
+2. Open `Actions`.
+3. Open the latest `CI` workflow run.
+4. Review `verify`.
+5. Review `Deploy staging`.
+
 ## Manual command reference
 
 Install:
@@ -82,6 +109,11 @@ Apply remote migrations:
 npx wrangler d1 migrations apply accountant-nimrodi --remote --env staging
 ```
 
+Note:
+
+- The current repository version of Wrangler does not expose `--yes` for `d1 migrations apply`.
+- GitHub Actions uses the same staging migration command that already works manually.
+
 Set admin secrets:
 
 ```bash
@@ -93,6 +125,12 @@ Deploy:
 
 ```bash
 npx wrangler deploy --env staging
+```
+
+Rotate the staging admin password later:
+
+```bash
+npx wrangler secret put ADMIN_PASSWORD --env staging
 ```
 
 ## Go-live checks
