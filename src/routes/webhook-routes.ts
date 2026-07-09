@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 
 import type { AppContainer } from "../app/container";
+import type { AppConfig } from "../shared/config/app-config";
 import { AppError } from "../shared/errors/app-error";
 import {
   renderMockGrowPaymentPage,
@@ -9,7 +10,8 @@ import {
 
 export function registerWebhookRoutes(
   app: Hono<{ Bindings: Env }>,
-  getContainer: (env?: Env) => AppContainer
+  getContainer: (env?: Env) => AppContainer,
+  getConfig: (env?: Env) => AppConfig
 ) {
   app.post("/api/mock-grow/webhook", async (c) => {
     const container = getContainer(c.env);
@@ -52,6 +54,7 @@ export function registerWebhookRoutes(
 
     return c.html(
       renderMockGrowPaymentPage({
+        appConfig: getConfig(c.env),
         payment,
         webhooks
       })
@@ -77,6 +80,12 @@ export function registerWebhookRoutes(
       throw new AppError("התשלום המשויך למסמך המדומה לא נמצא.", 404);
     }
 
-    return c.html(renderMockInvoicePage({ invoice, payment }));
+    return c.html(
+      renderMockInvoicePage({
+        appConfig: getConfig(c.env),
+        invoice,
+        payment
+      })
+    );
   });
 }

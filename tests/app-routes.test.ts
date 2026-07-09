@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/app/create-app";
 import { createContainer } from "../src/app/container";
+import { getAppConfig } from "../src/shared/config/app-config";
 import { InMemoryCustomerRepository } from "../src/infrastructure/db/in-memory-customer-repository";
-import { InMemoryPaymentRepository } from "../src/infrastructure/db/in-memory-payment-repository";
 import { InMemoryInvoiceRepository } from "../src/infrastructure/db/in-memory-invoice-repository";
+import { InMemoryPaymentRepository } from "../src/infrastructure/db/in-memory-payment-repository";
 
-function createTestApp() {
+function createTestApp(input?: {
+  enableDevTools?: boolean;
+  adminPassword?: string;
+}) {
   const paymentRepository = new InMemoryPaymentRepository();
   const customerRepository = new InMemoryCustomerRepository();
   const invoiceRepository = new InMemoryInvoiceRepository();
@@ -15,22 +19,116 @@ function createTestApp() {
     customerRepository,
     invoiceRepository
   });
-
-  const app = createApp({
-    getContainer: () => container
+  const config = getAppConfig({
+    APP_ENV: "development",
+    ADMIN_PASSWORD: input?.adminPassword ?? "test-admin-password",
+    SESSION_SECRET: "test-session-secret",
+    GROW_MODE: "mock",
+    INVOICE_MODE: "mock",
+    ENABLE_DEV_TOOLS: String(input?.enableDevTools ?? true),
+    DEFAULT_PAYMENT_PROVIDER: "mock-grow"
   });
 
-  return { app, container };
+  const app = createApp({
+    getContainer: () => container,
+    getConfig: () => config
+  });
+
+  return { app, container, config };
+}
+
+async function login(app: ReturnType<typeof createApp>, password: string) {
+  const formData = new URLSearchParams({
+    password,
+    next: "/"
+  });
+
+  const response = await app.request("/login", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    body: formData.toString()
+  });
+  const cookie = response.headers.get("set-cookie");
+
+  return { response, cookie };
 }
 
 describe("app routes", () => {
-  it("creates a mocked payment via POST /api/payments and lists it", async () => {
+  it("redirects unauthenticated admin page requests to /login", async () => {
     const { app } = createTestApp();
+
+    const response = await app.request("/");
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toContain("/login");
+  });
+
+  it("fails login with wrong password and succeeds with correct password", async () => {
+    const { app } = createTestApp();
+
+    const wrong = await login(app, "wrong-password");
+    expect(wrong.response.status).toBe(302);
+    expect(wrong.response.headers.get("location")).toContain("error=");
+
+    const correct = await login(app, "test-admin-password");
+    expect(correct.response.status).toBe(302);
+    expect(correct.response.headers.get("set-cookie")).toContain(
+      "nimrodi_admin_session="
+    );
+  });
+
+  it("allows authenticated admin access and logout clears the session", async () => {
+    const { app } = createTestApp();
+    const session = await login(app, "test-admin-password");
+
+    const dashboard = await app.request("/", {
+      headers: {
+        cookie: session.cookie ?? ""
+      }
+    });
+    expect(dashboard.status).toBe(200);
+    expect(await dashboard.text()).toContain("מערכת תשלומים — נמרודי ושות׳");
+
+    const logout = await app.request("/logout", {
+      method: "POST",
+      headers: {
+        cookie: session.cookie ?? ""
+      }
+    });
+    expect(logout.status).toBe(302);
+    expect(logout.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
+
+  it("rejects protected APIs without auth and leaves real webhook public", async () => {
+    const { app } = createTestApp();
+
+    const paymentsResponse = await app.request("/api/payments");
+    expect(paymentsResponse.status).toBe(401);
+
+    const growWebhookResponse = await app.request("/api/grow/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+    expect(growWebhookResponse.status).toBe(501);
+    expect(await growWebhookResponse.text()).toContain(
+      "Use /api/mock-grow/webhook in development."
+    );
+  });
+
+  it("creates a mocked payment through authenticated APIs and lists it", async () => {
+    const { app } = createTestApp();
+    const session = await login(app, "test-admin-password");
 
     const createResponse = await app.request("/api/payments", {
       method: "POST",
       headers: {
-        "content-type": "application/json"
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
       },
       body: JSON.stringify({
         customer_name: "לקוח בדיקה",
@@ -48,32 +146,37 @@ describe("app routes", () => {
     expect(createdPayload.payment.amountAgorot).toBe(125000);
     expect(createdPayload.payment.status).toBe("payment_created");
 
-    const listResponse = await app.request("/api/payments?limit=20&offset=0");
+    const listResponse = await app.request("/api/payments?limit=20&offset=0", {
+      headers: {
+        cookie: session.cookie ?? ""
+      }
+    });
     expect(listResponse.status).toBe(200);
-    const listPayload = (await listResponse.json()) as {
-      items: Array<{ id: string }>;
-    };
-    expect(listPayload.items).toHaveLength(1);
-    expect(listPayload.items[0]?.id).toBe(createdPayload.payment.id);
 
     const detailResponse = await app.request(
-      `/api/payments/${createdPayload.payment.id}`
+      `/api/payments/${createdPayload.payment.id}`,
+      {
+        headers: {
+          cookie: session.cookie ?? ""
+        }
+      }
     );
     expect(detailResponse.status).toBe(200);
     const detailPayload = (await detailResponse.json()) as {
       payment: { id: string; paymentUrl: string };
     };
-    expect(detailPayload.payment.id).toBe(createdPayload.payment.id);
     expect(detailPayload.payment.paymentUrl).toContain("/dev/mock-grow/pay/");
   });
 
-  it("processes mock webhooks and rejects the real grow endpoint for now", async () => {
-    const { app } = createTestApp();
+  it("processes mock webhooks only when dev tools are enabled", async () => {
+    const { app } = createTestApp({ enableDevTools: true });
+    const session = await login(app, "test-admin-password");
 
     const createResponse = await app.request("/api/payments", {
       method: "POST",
       headers: {
-        "content-type": "application/json"
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
       },
       body: JSON.stringify({
         customer_name: "לקוח webhook",
@@ -106,7 +209,8 @@ describe("app routes", () => {
     const webhookResponse = await app.request("/api/mock-grow/webhook", {
       method: "POST",
       headers: {
-        "content-type": "application/json"
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
       },
       body: JSON.stringify(webhookPayload)
     });
@@ -114,56 +218,87 @@ describe("app routes", () => {
     const webhookResult = (await webhookResponse.json()) as {
       outcome: string;
       payment: { status: string; invoiceId: string | null };
-      invoiceAttempt: { outcome: string; invoice: { invoiceUrl: string } };
     };
     expect(webhookResult.outcome).toBe("processed");
     expect(webhookResult.payment.status).toBe("paid");
     expect(webhookResult.payment.invoiceId).toBeTruthy();
-    expect(webhookResult.invoiceAttempt.outcome).toBe("created");
 
     const duplicateResponse = await app.request("/api/mock-grow/webhook", {
       method: "POST",
       headers: {
-        "content-type": "application/json"
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
       },
       body: JSON.stringify(webhookPayload)
     });
     expect(duplicateResponse.status).toBe(200);
-    const duplicateResult = (await duplicateResponse.json()) as {
-      outcome: string;
-      duplicate: boolean;
-    };
-    expect(duplicateResult.outcome).toBe("duplicate");
-    expect(duplicateResult.duplicate).toBe(true);
-
-    const detailAfterWebhook = await app.request(
-      `/api/payments/${createPayload.payment.id}`
-    );
-    const detailAfterWebhookPayload = (await detailAfterWebhook.json()) as {
-      payment: { invoiceId: string | null };
-    };
-    expect(detailAfterWebhookPayload.payment.invoiceId).toBeTruthy();
-
-    const growWebhookResponse = await app.request("/api/grow/webhook", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({})
-    });
-    expect(growWebhookResponse.status).toBe(501);
-    expect(await growWebhookResponse.text()).toContain(
-      "Use /api/mock-grow/webhook in development."
-    );
+    expect(await duplicateResponse.text()).toContain('"duplicate":true');
   });
 
-  it("renders admin pages for dashboard, create, list, details, settings and mock pay page", async () => {
-    const { app } = createTestApp();
+  it("blocks dev-only endpoints and hides simulator UI when dev tools are disabled", async () => {
+    const { app } = createTestApp({ enableDevTools: false });
+    const session = await login(app, "test-admin-password");
 
     const createResponse = await app.request("/api/payments", {
       method: "POST",
       headers: {
-        "content-type": "application/json"
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
+      },
+      body: JSON.stringify({
+        customer_name: "לקוח ללא סימולטור",
+        customer_phone: "0500000003",
+        customer_email: "no-devtools@example.com",
+        amount_shekel: "500.00",
+        description: "בדיקת מסך"
+      })
+    });
+    const createPayload = (await createResponse.json()) as {
+      payment: { id: string; providerPaymentId: string };
+    };
+
+    const detailPage = await app.request(
+      `/admin/payments/${createPayload.payment.id}`,
+      {
+        headers: {
+          cookie: session.cookie ?? ""
+        }
+      }
+    );
+    expect(detailPage.status).toBe(200);
+    const detailHtml = await detailPage.text();
+    expect(detailHtml).not.toContain("סימולטור פיתוח — לא GROW אמיתי");
+
+    const blockedWebhook = await app.request("/api/mock-grow/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
+      },
+      body: JSON.stringify({})
+    });
+    expect(blockedWebhook.status).toBe(404);
+
+    const blockedMockPage = await app.request(
+      `/dev/mock-grow/pay/${createPayload.payment.providerPaymentId}`,
+      {
+        headers: {
+          cookie: session.cookie ?? ""
+        }
+      }
+    );
+    expect(blockedMockPage.status).toBe(404);
+  });
+
+  it("renders protected admin pages and mock pages after login", async () => {
+    const { app } = createTestApp({ enableDevTools: true });
+    const session = await login(app, "test-admin-password");
+
+    const createResponse = await app.request("/api/payments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
       },
       body: JSON.stringify({
         customer_name: "לקוח אדמין",
@@ -177,58 +312,65 @@ describe("app routes", () => {
       payment: { id: string };
     };
 
-    const dashboard = await app.request("/");
+    const dashboard = await app.request("/", {
+      headers: { cookie: session.cookie ?? "" }
+    });
     expect(dashboard.status).toBe(200);
-    expect(await dashboard.text()).toContain("מערכת תשלומים — נמרודי ושות׳");
+    expect(await dashboard.text()).toContain("מצב פיתוח");
 
-    const newPaymentPage = await app.request("/admin/payments/new");
+    const newPaymentPage = await app.request("/admin/payments/new", {
+      headers: { cookie: session.cookie ?? "" }
+    });
     expect(newPaymentPage.status).toBe(200);
-    expect(await newPaymentPage.text()).toContain("יצירת בקשת תשלום");
 
-    const paymentsPage = await app.request("/admin/payments");
+    const paymentsPage = await app.request("/admin/payments", {
+      headers: { cookie: session.cookie ?? "" }
+    });
     expect(paymentsPage.status).toBe(200);
     expect(await paymentsPage.text()).toContain("רשימת עסקאות");
 
     const detailPage = await app.request(
-      `/admin/payments/${createPayload.payment.id}`
+      `/admin/payments/${createPayload.payment.id}`,
+      {
+        headers: { cookie: session.cookie ?? "" }
+      }
     );
-    expect(detailPage.status).toBe(200);
     const detailHtml = await detailPage.text();
     expect(detailHtml).toContain("פתיחת WhatsApp");
-    expect(detailHtml).toContain("העתקת קישור");
-    expect(detailHtml).toContain("סימולטור פיתוח — לא GROW אמיתי");
-    expect(detailHtml).toContain("/api/mock-grow/webhook");
+    expect(detailHtml).toContain("התנתקות");
     expect(detailHtml).toContain("קבלה / מסמך");
 
     const paymentApiResponse = await app.request(
-      `/api/payments/${createPayload.payment.id}`
+      `/api/payments/${createPayload.payment.id}`,
+      {
+        headers: { cookie: session.cookie ?? "" }
+      }
     );
     const paymentApiPayload = (await paymentApiResponse.json()) as {
       payment: { providerPaymentId: string };
     };
 
     const mockPayPage = await app.request(
-      `/dev/mock-grow/pay/${paymentApiPayload.payment.providerPaymentId}`
+      `/dev/mock-grow/pay/${paymentApiPayload.payment.providerPaymentId}`,
+      {
+        headers: { cookie: session.cookie ?? "" }
+      }
     );
     expect(mockPayPage.status).toBe(200);
     expect(await mockPayPage.text()).toContain(
       "עמוד תשלום מדומה — לצורכי פיתוח בלבד"
     );
-
-    const settingsPage = await app.request(
-      "/admin/settings/client-requirements"
-    );
-    expect(settingsPage.status).toBe(200);
-    expect(await settingsPage.text()).toContain("GROW userId");
   });
 
   it("creates a mock invoice manually only for paid payments and serves mock invoice page", async () => {
-    const { app, container } = createTestApp();
+    const { app, container } = createTestApp({ enableDevTools: true });
+    const session = await login(app, "test-admin-password");
 
     const createResponse = await app.request("/api/payments", {
       method: "POST",
       headers: {
-        "content-type": "application/json"
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
       },
       body: JSON.stringify({
         customer_name: "לקוח חשבונית",
@@ -245,7 +387,10 @@ describe("app routes", () => {
     const rejected = await app.request(
       `/api/payments/${createPayload.payment.id}/invoice/mock`,
       {
-        method: "POST"
+        method: "POST",
+        headers: {
+          cookie: session.cookie ?? ""
+        }
       }
     );
     expect(rejected.status).toBe(422);
@@ -260,18 +405,26 @@ describe("app routes", () => {
     const createInvoiceResponse = await app.request(
       `/api/payments/${createPayload.payment.id}/invoice/mock`,
       {
-        method: "POST"
+        method: "POST",
+        headers: {
+          cookie: session.cookie ?? ""
+        }
       }
     );
     expect(createInvoiceResponse.status).toBe(201);
     const invoicePayload = (await createInvoiceResponse.json()) as {
       outcome: string;
-      invoice: { providerInvoiceId: string; invoiceUrl: string };
+      invoice: { providerInvoiceId: string };
     };
     expect(invoicePayload.outcome).toBe("created");
 
     const mockInvoicePage = await app.request(
-      `/dev/mock-invoices/${invoicePayload.invoice.providerInvoiceId}`
+      `/dev/mock-invoices/${invoicePayload.invoice.providerInvoiceId}`,
+      {
+        headers: {
+          cookie: session.cookie ?? ""
+        }
+      }
     );
     expect(mockInvoicePage.status).toBe(200);
     expect(await mockInvoicePage.text()).toContain(

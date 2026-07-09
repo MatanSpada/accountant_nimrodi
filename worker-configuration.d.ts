@@ -3,5 +3,8 @@
 interface Env {
   APP_ENV: "development";
   DEFAULT_PAYMENT_PROVIDER: "mock-grow";
+  GROW_MODE: "mock";
+  INVOICE_MODE: "mock";
+  ENABLE_DEV_TOOLS: "true";
   DB: D1Database;
 }

@@ -25,6 +25,9 @@ jobs:
       - name: Generate Cloudflare types
         run: npm run cf-typegen
 
+      - name: Format check
+        run: npm run format:check
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -33,7 +36,3 @@ jobs:
 
       - name: Test
         run: npm run test
-
-      # Future deployment job:
-      # - add Cloudflare credentials
-      # - run wrangler deploy against a staging environment

@@ -258,6 +258,75 @@
 - Tradeoff:
   - the schema now spans multiple migration files even though the project is still early
 
+## Admin authentication approach
+
+- I used a simple password-based login with a signed session cookie.
+- Meaning:
+  - the internal admin UI and internal payment APIs are protected without introducing an external identity provider in this MVP
+  - the authentication boundary stays inside the Worker and can be replaced later
+- Tradeoff:
+  - this is weaker and less auditable than a full SSO or Cloudflare Access setup
+  - password rotation and user-level attribution are still manual
+
+## Why not Cloudflare Access yet
+
+- Cloudflare Access is a strong future option, but it was not added in this phase because the current requirement was a self-contained MVP-safe internal tool without requiring client account setup during development.
+- Meaning:
+  - the app can run locally and in early staging with only Worker secrets
+  - the auth code remains modular so Cloudflare Access can replace or supplement it later
+- Tradeoff:
+  - identity control is application-managed for now instead of Cloudflare-managed
+
+## Dev-tools gating strategy
+
+- Development-only endpoints and simulator UI are gated by `ENABLE_DEV_TOOLS`.
+- Meaning:
+  - `/api/mock-grow/webhook` and `/dev/*` can be used safely in development
+  - the same codebase can be deployed to staging or production without exposing mock tools
+- Tradeoff:
+  - there is one more environment control to validate and document
+  - operators must be disciplined about environment configuration
+
+## Config validation strategy
+
+- Runtime configuration is parsed centrally from a single config module.
+- Meaning:
+  - route handlers and services consume validated values instead of reading raw environment variables ad hoc
+  - invalid production configuration fails early and predictably
+- Tradeoff:
+  - startup is stricter, so incomplete deployment configuration causes immediate failure instead of partial functionality
+
+## Production safety rules for config
+
+- `GROW_MODE` and `INVOICE_MODE` are still restricted to `mock`.
+- `ENABLE_DEV_TOOLS=true` is rejected in `production`.
+- development defaults for `ADMIN_PASSWORD` and `SESSION_SECRET` are allowed only in `APP_ENV=development`.
+- Meaning:
+  - the repo cannot quietly drift into pretending that real integrations exist
+  - accidental production exposure of simulators is blocked by config and tests
+- Tradeoff:
+  - staging and production setup now require explicit secret management before the app can be considered ready
+
+## Health versus readiness decision
+
+- `/health` remains lightweight and safe, while `/ready` additionally checks validated config and D1 availability.
+- Meaning:
+  - uptime checks can stay simple
+  - deployment or orchestration checks can use readiness without exposing secrets
+- Tradeoff:
+  - there are now two operational endpoints to document and monitor
+
+## CI/CD approach and tradeoffs
+
+- CI now verifies format, lint, typecheck, generated Worker types, and tests on push/pull request.
+- A separate deploy workflow exists only as a manual placeholder and runs only when Cloudflare secrets exist.
+- Meaning:
+  - the repo gains deployment preparation without forcing secret-dependent failures in normal CI
+  - production deployment remains an intentional step
+- Tradeoff:
+  - deployment automation is not fully active yet
+  - the final production rollout still depends on client-owned Cloudflare credentials and environment setup
+
 ## Why the mock invoice page is not a legal document
 
 - The mock invoice page exists only to verify orchestration and stored data during development.

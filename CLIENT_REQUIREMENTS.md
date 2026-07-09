@@ -2,6 +2,8 @@
 
 - Client-owned Cloudflare account
 - Technical/admin access for the developer
+- Client-owned domain/subdomain decision, for example `payments.nimrodi.co.il`
+- Client-owned D1 database under the client Cloudflare account
 - Client-owned GROW account
 - GROW userId
 - GROW pageCode
@@ -27,6 +29,5 @@
     - חשבונית עסקה
     - other
   - required VAT / tax behavior, as instructed by the client/accountant
-- Domain/subdomain decision, for example `payments.nimrodi.co.il` or a temporary Cloudflare URL
 
 Document type must be confirmed by the client/accountant. This repo does not decide accounting or legal document behavior on its own.

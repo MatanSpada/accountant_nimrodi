@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 
 import type { AppContainer } from "../app/container";
+import type { AppConfig } from "../shared/config/app-config";
 import {
   renderClientRequirementsPage,
   renderDashboardPage,
@@ -12,15 +13,18 @@ import { AppError } from "../shared/errors/app-error";
 
 export function registerAdminRoutes(
   app: Hono<{ Bindings: Env }>,
-  getContainer: (env?: Env) => AppContainer
+  getContainer: (env?: Env) => AppContainer,
+  getConfig: (env?: Env) => AppConfig
 ) {
   app.get("/", async (c) => {
     const container = getContainer(c.env);
+    const appConfig = getConfig(c.env);
     const payments = await container.paymentService.listPayments({ limit: 20 });
-    return c.html(renderDashboardPage({ payments: payments.items }));
+    return c.html(renderDashboardPage({ appConfig, payments: payments.items }));
   });
 
   app.get("/admin/payments/new", (c) => {
+    const appConfig = getConfig(c.env);
     const errorMessage = c.req.query("error") ?? null;
     const formValues = {
       customer_name: c.req.query("customer_name") ?? "",
@@ -32,6 +36,7 @@ export function registerAdminRoutes(
 
     return c.html(
       renderNewPaymentPage({
+        appConfig,
         errorMessage,
         formValues
       })
@@ -40,6 +45,7 @@ export function registerAdminRoutes(
 
   app.get("/admin/payments", async (c) => {
     const container = getContainer(c.env);
+    const appConfig = getConfig(c.env);
     const limit = Number(c.req.query("limit") ?? "20");
     const offset = Number(c.req.query("offset") ?? "0");
     const payments = await container.paymentService.listPayments({
@@ -47,11 +53,12 @@ export function registerAdminRoutes(
       offset: Number.isFinite(offset) ? offset : 0
     });
 
-    return c.html(renderPaymentsListPage({ payments }));
+    return c.html(renderPaymentsListPage({ appConfig, payments }));
   });
 
   app.get("/admin/payments/:id", async (c) => {
     const container = getContainer(c.env);
+    const appConfig = getConfig(c.env);
     const payment = await container.paymentService.getPaymentById(
       c.req.param("id")
     );
@@ -70,6 +77,7 @@ export function registerAdminRoutes(
 
     return c.html(
       renderPaymentDetailsPage({
+        appConfig,
         payment,
         invoice,
         webhooks,
@@ -82,6 +90,10 @@ export function registerAdminRoutes(
   });
 
   app.get("/admin/settings/client-requirements", (c) => {
-    return c.html(renderClientRequirementsPage());
+    return c.html(
+      renderClientRequirementsPage({
+        appConfig: getConfig(c.env)
+      })
+    );
   });
 }

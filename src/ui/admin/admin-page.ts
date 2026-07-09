@@ -3,6 +3,7 @@ import type { PaymentListResult } from "../../domain/payments/payment-repository
 import { isFinalPaymentStatus } from "../../domain/payments/payment-status";
 import type { Payment } from "../../domain/payments/payment-types";
 import type { PaymentWebhookRecord } from "../../domain/payments/payment-webhook-types";
+import type { AppConfig } from "../../shared/config/app-config";
 import { CLIENT_REQUIREMENTS_ITEMS } from "./client-requirements";
 import { escapeHtml, formatAmountAgorot, formatDateTime } from "./formatters";
 import { getInvoiceStatusLabel } from "./invoice-status-labels";
@@ -10,6 +11,7 @@ import { getPaymentStatusLabel } from "./status-labels";
 import { buildWhatsAppLink } from "./whatsapp-helper";
 
 function renderLayout(input: {
+  appConfig: AppConfig;
   title: string;
   activePath: "dashboard" | "new-payment" | "payments" | "settings";
   content: string;
@@ -297,6 +299,43 @@ function renderLayout(input: {
           margin-bottom: 8px;
           font-size: 0.95rem;
         }
+        .topbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 16px;
+          flex-wrap: wrap;
+        }
+        .topbar-actions {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+        .env-pill {
+          display: inline-flex;
+          align-items: center;
+          padding: 8px 12px;
+          border-radius: 999px;
+          background: var(--surface-soft);
+          border: 1px solid var(--line);
+          color: var(--ink-soft);
+          font-size: 0.9rem;
+        }
+        .banner-stack {
+          display: grid;
+          gap: 10px;
+          margin-bottom: 18px;
+        }
+        .banner {
+          padding: 14px 16px;
+          border-radius: 14px;
+          border: 1px solid var(--line);
+          background: #f8efe0;
+          color: #6b4d25;
+          line-height: 1.6;
+        }
         .copy-feedback {
           color: var(--success);
           font-size: 0.95rem;
@@ -358,11 +397,26 @@ function renderLayout(input: {
           </div>
         </aside>
         <main>
-          ${
-            input.pageTitle
-              ? `<div class="page-kicker">${escapeHtml(input.pageTitle)}</div>`
-              : ""
-          }
+          <div class="topbar">
+            <div>
+              ${
+                input.pageTitle
+                  ? `<div class="page-kicker">${escapeHtml(input.pageTitle)}</div>`
+                  : ""
+              }
+            </div>
+            <div class="topbar-actions">
+              ${
+                input.appConfig.appEnv !== "production"
+                  ? `<span class="env-pill">סביבה: ${escapeHtml(input.appConfig.appEnv)}</span>`
+                  : ""
+              }
+              <form method="post" action="/logout">
+                <button type="submit" class="button secondary">התנתקות</button>
+              </form>
+            </div>
+          </div>
+          ${renderSystemBanners(input.appConfig)}
           ${input.content}
         </main>
       </div>
@@ -471,6 +525,32 @@ function renderLayout(input: {
       </script>
     </body>
   </html>`;
+}
+
+function renderSystemBanners(appConfig: AppConfig) {
+  const banners: string[] = [];
+
+  if (appConfig.growMode === "mock" || appConfig.invoiceMode === "mock") {
+    banners.push(
+      "מצב פיתוח: התשלומים והקבלות מדומים. אין כאן חיבור אמיתי ל-GROW או לספק מסמכים אמיתי."
+    );
+  }
+
+  if (appConfig.enableDevTools) {
+    banners.push(
+      "כלי פיתוח פעילים: סימולטורים ועמודי mock נגישים למשתמשי הניהול בלבד."
+    );
+  }
+
+  if (banners.length === 0) {
+    return "";
+  }
+
+  return `
+    <div class="banner-stack">
+      ${banners.map((banner) => `<div class="banner">${escapeHtml(banner)}</div>`).join("")}
+    </div>
+  `;
 }
 
 function renderSimulatorForms(payment: Payment, redirectPath: string) {
@@ -647,8 +727,113 @@ function renderPaymentRows(payments: Payment[]) {
     .join("");
 }
 
-export function renderDashboardPage(input: { payments: Payment[] }) {
+export function renderLoginPage(input: {
+  appConfig: AppConfig;
+  errorMessage?: string | null;
+  nextPath?: string;
+}) {
+  const nextPath = input.nextPath?.startsWith("/") ? input.nextPath : "/";
+
+  return `<!DOCTYPE html>
+  <html lang="he" dir="rtl">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>התחברות — נמרודי ושות׳</title>
+      <style>
+        :root {
+          --bg: #f3f1eb;
+          --surface: #fffdf8;
+          --line: #d9d4ca;
+          --brand: #1d3557;
+          --ink: #1f2a37;
+          --ink-soft: #5a6775;
+          --danger: #8f3d3d;
+          --shadow: 0 18px 50px rgba(24, 35, 52, 0.08);
+          --font: "Noto Sans Hebrew", "Segoe UI", sans-serif;
+        }
+        body {
+          margin: 0;
+          min-height: 100vh;
+          display: grid;
+          place-items: center;
+          padding: 24px;
+          font-family: var(--font);
+          background:
+            radial-gradient(circle at top right, rgba(29, 53, 87, 0.06), transparent 32%),
+            linear-gradient(180deg, #f7f4ef 0%, var(--bg) 100%);
+          color: var(--ink);
+        }
+        .card {
+          width: min(460px, 100%);
+          background: var(--surface);
+          border: 1px solid var(--line);
+          border-radius: 22px;
+          padding: 28px;
+          box-shadow: var(--shadow);
+        }
+        h1 { margin: 0 0 8px; }
+        p { color: var(--ink-soft); line-height: 1.7; }
+        label { display: grid; gap: 8px; margin-top: 18px; color: var(--ink-soft); }
+        input {
+          width: 100%;
+          box-sizing: border-box;
+          padding: 12px 14px;
+          border-radius: 12px;
+          border: 1px solid var(--line);
+          font: inherit;
+        }
+        button {
+          margin-top: 18px;
+          width: 100%;
+          padding: 14px 16px;
+          border: 0;
+          border-radius: 12px;
+          font: inherit;
+          background: var(--brand);
+          color: white;
+          cursor: pointer;
+        }
+        .note, .error {
+          margin-top: 14px;
+          padding: 12px 14px;
+          border-radius: 12px;
+          line-height: 1.6;
+        }
+        .note { background: #ecf0f5; color: var(--brand); }
+        .error { background: #f9e3e3; color: var(--danger); }
+      </style>
+    </head>
+    <body>
+      <section class="card">
+        <div>נמרודי ושות׳ – רואי חשבון</div>
+        <h1>כניסה למערכת התשלומים</h1>
+        <p>אזור זה מיועד לשימוש פנימי בלבד. לאחר ההתחברות יוצגו בקשות התשלום, הסימולטורים וכלי הניהול.</p>
+        ${input.errorMessage ? `<div class="error">${escapeHtml(input.errorMessage)}</div>` : ""}
+        ${
+          input.appConfig.appEnv !== "production"
+            ? `<div class="note">סביבה נוכחית: ${escapeHtml(input.appConfig.appEnv)}. סיסמת ברירת המחדל המקומית מתועדת ב-README רק לשימוש פיתוח.</div>`
+            : ""
+        }
+        <form method="post" action="/login">
+          <input type="hidden" name="next" value="${escapeHtml(nextPath)}" />
+          <label>
+            סיסמת ניהול
+            <input type="password" name="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit">התחברות</button>
+        </form>
+      </section>
+    </body>
+  </html>`;
+}
+
+export function renderDashboardPage(input: {
+  appConfig: AppConfig;
+  payments: Payment[];
+}) {
   return renderLayout({
+    appConfig: input.appConfig,
     title: "מערכת תשלומים — נמרודי ושות׳",
     activePath: "dashboard",
     content: `
@@ -718,12 +903,14 @@ export function renderDashboardPage(input: { payments: Payment[] }) {
 }
 
 export function renderNewPaymentPage(input: {
+  appConfig: AppConfig;
   errorMessage?: string | null;
   formValues?: Record<string, string>;
 }) {
   const values = input.formValues ?? {};
 
   return renderLayout({
+    appConfig: input.appConfig,
     title: "יצירת בקשת תשלום — נמרודי ושות׳",
     activePath: "new-payment",
     pageTitle: "יצירת בקשת תשלום",
@@ -809,7 +996,10 @@ export function renderNewPaymentPage(input: {
   });
 }
 
-export function renderPaymentsListPage(input: { payments: PaymentListResult }) {
+export function renderPaymentsListPage(input: {
+  appConfig: AppConfig;
+  payments: PaymentListResult;
+}) {
   const previousOffset = Math.max(
     0,
     input.payments.offset - input.payments.limit
@@ -817,6 +1007,7 @@ export function renderPaymentsListPage(input: { payments: PaymentListResult }) {
   const nextOffset = input.payments.offset + input.payments.limit;
 
   return renderLayout({
+    appConfig: input.appConfig,
     title: "עסקאות — נמרודי ושות׳",
     activePath: "payments",
     pageTitle: "עסקאות",
@@ -863,6 +1054,7 @@ export function renderPaymentsListPage(input: { payments: PaymentListResult }) {
 }
 
 export function renderPaymentDetailsPage(input: {
+  appConfig: AppConfig;
   payment: Payment;
   invoice: InvoiceRecord | null;
   webhooks: PaymentWebhookRecord[];
@@ -880,6 +1072,7 @@ export function renderPaymentDetailsPage(input: {
   });
 
   return renderLayout({
+    appConfig: input.appConfig,
     title: `בקשת תשלום ${input.payment.id} — נמרודי ושות׳`,
     activePath: "payments",
     pageTitle: "פרטי עסקה",
@@ -956,12 +1149,18 @@ export function renderPaymentDetailsPage(input: {
             <a class="button secondary" href="/admin/payments">חזרה לרשימת העסקאות</a>
           </div>
         </section>
-        <section class="card">
-          <h3>סימולטור פיתוח — לא GROW אמיתי</h3>
-          <p>הכפתורים למטה שולחים payload מדומה ל-<span class="inline-code">/api/mock-grow/webhook</span> כדי לבדוק את שרשרת העדכון: שמירת webhook, אימות, ועדכון סטטוס התשלום.</p>
-          ${renderSimulatorForms(input.payment, `/admin/payments/${input.payment.id}`)}
-          <div class="note">אין כאן schema אמיתי של GROW. המימוש הסופי יתבצע רק לאחר קבלת payloads מאומתים מהחשבון של הלקוח.</div>
-        </section>
+        ${
+          input.appConfig.enableDevTools
+            ? `
+              <section class="card">
+                <h3>סימולטור פיתוח — לא GROW אמיתי</h3>
+                <p>הכפתורים למטה שולחים payload מדומה ל-<span class="inline-code">/api/mock-grow/webhook</span> כדי לבדוק את שרשרת העדכון: שמירת webhook, אימות, ועדכון סטטוס התשלום.</p>
+                ${renderSimulatorForms(input.payment, `/admin/payments/${input.payment.id}`)}
+                <div class="note">אין כאן schema אמיתי של GROW. המימוש הסופי יתבצע רק לאחר קבלת payloads מאומתים מהחשבון של הלקוח.</div>
+              </section>
+            `
+            : ""
+        }
         <section class="card">
           <h3>קבלה / מסמך</h3>
           <p>כאשר התשלום מסומן כשולם, המערכת מנסה ליצור מסמך מדומה בדיוק פעם אחת. duplicate webhook לא אמור ליצור מסמך נוסף.</p>
@@ -981,10 +1180,12 @@ export function renderPaymentDetailsPage(input: {
 }
 
 export function renderMockGrowPaymentPage(input: {
+  appConfig: AppConfig;
   payment: Payment;
   webhooks: PaymentWebhookRecord[];
 }) {
   return renderLayout({
+    appConfig: input.appConfig,
     title: `עמוד תשלום מדומה ${input.payment.id} — נמרודי ושות׳`,
     activePath: "payments",
     pageTitle: "עמוד תשלום מדומה",
@@ -1025,10 +1226,12 @@ export function renderMockGrowPaymentPage(input: {
 }
 
 export function renderMockInvoicePage(input: {
+  appConfig: AppConfig;
   invoice: InvoiceRecord;
   payment: Payment;
 }) {
   return renderLayout({
+    appConfig: input.appConfig,
     title: `מסמך מדומה ${input.invoice.invoiceNumber ?? input.invoice.id} — נמרודי ושות׳`,
     activePath: "payments",
     pageTitle: "מסמך מדומה",
@@ -1059,8 +1262,9 @@ export function renderMockInvoicePage(input: {
   });
 }
 
-export function renderClientRequirementsPage() {
+export function renderClientRequirementsPage(input: { appConfig: AppConfig }) {
   return renderLayout({
+    appConfig: input.appConfig,
     title: "דרישות חסרות — נמרודי ושות׳",
     activePath: "settings",
     pageTitle: "הגדרות / דרישות חסרות",
