@@ -70,6 +70,8 @@ function getWebhookEventLabel(eventType: string) {
   return labels[eventType] ?? eventType;
 }
 
+const APP_VERSION = "גרסת בטא";
+
 const CSS = `
   :root {
     --bg: #f0f2f5;
@@ -411,6 +413,7 @@ const CSS = `
 
   .recent-table tbody tr {
     transition: background 120ms ease;
+    cursor: pointer;
   }
 
   .recent-table tbody tr:hover {
@@ -1177,6 +1180,7 @@ function renderLayout(input: {
             התנתקות
           </button>
         </form>
+        <div style="padding:8px 8px 0;font-size:0.7rem;color:#374151;letter-spacing:0.04em;">${APP_VERSION}</div>
       </div>
     </aside>
     <main>
