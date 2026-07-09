@@ -183,6 +183,15 @@ Before real deployment:
 5. Keep `ENABLE_DEV_TOOLS=false` in production.
 6. Keep `GROW_MODE=mock` until real sandbox/production details are confirmed.
 
+Current temporary staging deployment on the developer Cloudflare account uses:
+
+```bash
+npx wrangler d1 migrations apply accountant-nimrodi --remote --env staging
+npx wrangler secret put ADMIN_PASSWORD --env staging
+npx wrangler secret put SESSION_SECRET --env staging
+npx wrangler deploy --env staging
+```
+
 See [DEPLOYMENT_CHECKLIST.md](/home/matan/Documents/accountant_nimrodi/DEPLOYMENT_CHECKLIST.md) for the full checklist.
 
 ## Operations and data ownership
@@ -194,7 +203,7 @@ See [DEPLOYMENT_CHECKLIST.md](/home/matan/Documents/accountant_nimrodi/DEPLOYMEN
 Manual D1 export example for later client operations:
 
 ```bash
-npx wrangler d1 export nimrodi_payments --remote --output=./nimrodi-payments-export.sql
+npx wrangler d1 export accountant-nimrodi --remote --env staging --output=./accountant-nimrodi-export.sql
 ```
 
 Rotate admin secrets later with:

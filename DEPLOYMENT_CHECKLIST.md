@@ -73,26 +73,26 @@ npm run cf-typegen
 Create D1:
 
 ```bash
-npx wrangler d1 create nimrodi_payments
+npx wrangler d1 create accountant-nimrodi
 ```
 
 Apply remote migrations:
 
 ```bash
-npx wrangler d1 migrations apply nimrodi_payments --remote
+npx wrangler d1 migrations apply accountant-nimrodi --remote --env staging
 ```
 
 Set admin secrets:
 
 ```bash
-npx wrangler secret put ADMIN_PASSWORD
-npx wrangler secret put SESSION_SECRET
+npx wrangler secret put ADMIN_PASSWORD --env staging
+npx wrangler secret put SESSION_SECRET --env staging
 ```
 
 Deploy:
 
 ```bash
-npx wrangler deploy
+npx wrangler deploy --env staging
 ```
 
 ## Go-live checks

@@ -24,5 +24,27 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "preview_database_id": "00000000-0000-0000-0000-000000000000"
     }
-  ]
+  ],
+  "env": {
+    "staging": {
+      "name": "accountant-nimrodi",
+      "vars": {
+        "APP_ENV": "staging",
+        "DEFAULT_PAYMENT_PROVIDER": "mock-grow",
+        "GROW_MODE": "mock",
+        "ALLOW_MOCK_GROW_IN_PRODUCTION": "false",
+        "INVOICE_MODE": "mock",
+        "ENABLE_DEV_TOOLS": "true",
+        "GROW_FORCE_BANK_TRANSFER_ONLY": "false"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "accountant-nimrodi",
+          "database_id": "914c2c12-9545-42d7-8c81-5c5fe8565ad1",
+          "preview_database_id": "914c2c12-9545-42d7-8c81-5c5fe8565ad1"
+        }
+      ]
+    }
+  }
 }
