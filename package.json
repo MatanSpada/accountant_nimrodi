@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "cf-typegen": "wrangler types",
+    "cf-typegen": "wrangler types && prettier --write worker-configuration.d.ts",
     "db:migrate:local": "wrangler d1 migrations apply nimrodi_payments --local",
     "db:execute:local": "wrangler d1 execute nimrodi_payments --local --file",
     "grow:smoke": "node scripts/grow-smoke.mjs"
