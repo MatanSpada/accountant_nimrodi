@@ -3,6 +3,7 @@ import type { Hono } from "hono";
 import type { AppContainer } from "../app/container";
 import type { AppConfig } from "../shared/config/app-config";
 import {
+  type DashboardMetrics,
   renderClientRequirementsPage,
   renderDashboardPage,
   renderNewPaymentPage,
@@ -27,20 +28,65 @@ export function registerAdminRoutes(
   app.get("/", async (c) => {
     const container = getContainer(c.env);
     const appConfig = getConfig(c.env);
-    const payments = await container.paymentService.listPayments({ limit: 20 });
+    const recentPayments = await container.paymentService.listPayments({
+      limit: 8
+    });
+    const allPayments = await container.paymentService.listPayments({
+      limit: 1000,
+      offset: 0
+    });
     const invoices = await Promise.all(
-      payments.items.map((payment) =>
+      recentPayments.items.map((payment) =>
         container.invoiceService.getInvoiceByPaymentId(payment.id)
       )
     );
+    const pendingStatuses = new Set<
+      DashboardMetrics["statusBreakdown"][number]["status"]
+    >(["draft", "payment_created", "pending"]);
+    const statusBreakdownItems = [
+      { status: "paid", label: "שולמו" },
+      { status: "pending", label: "ממתינים" },
+      { status: "payment_created", label: "קישור נוצר" },
+      { status: "failed", label: "נכשלו" },
+      { status: "cancelled", label: "בוטלו" },
+      { status: "expired", label: "פג תוקף" },
+      { status: "draft", label: "טיוטות" }
+    ] as const satisfies ReadonlyArray<{
+      status: DashboardMetrics["statusBreakdown"][number]["status"];
+      label: string;
+    }>;
+    const statusBreakdown: DashboardMetrics["statusBreakdown"] =
+      statusBreakdownItems.map((item) => ({
+        ...item,
+        count: allPayments.items.filter(
+          (payment) => payment.status === item.status
+        ).length
+      }));
+    const metrics: DashboardMetrics = {
+      totalRequests: allPayments.items.length,
+      paidCount: allPayments.items.filter(
+        (payment) => payment.status === "paid"
+      ).length,
+      pendingCount: allPayments.items.filter((payment) =>
+        pendingStatuses.has(payment.status)
+      ).length,
+      paidAmountAgorot: allPayments.items
+        .filter((payment) => payment.status === "paid")
+        .reduce((total, payment) => total + payment.amountAgorot, 0),
+      pendingAmountAgorot: allPayments.items
+        .filter((payment) => pendingStatuses.has(payment.status))
+        .reduce((total, payment) => total + payment.amountAgorot, 0),
+      statusBreakdown
+    };
 
     return c.html(
       renderDashboardPage({
         appConfig,
-        payments: payments.items.map((payment, index) => ({
+        payments: recentPayments.items.map((payment, index) => ({
           payment,
           invoice: invoices[index] ?? null
-        }))
+        })),
+        metrics
       })
     );
   });

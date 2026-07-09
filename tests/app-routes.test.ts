@@ -89,7 +89,7 @@ describe("app routes", () => {
       }
     });
     expect(dashboard.status).toBe(200);
-    expect(await dashboard.text()).toContain("מערכת תשלומים — נמרודי ושות׳");
+    expect(await dashboard.text()).toContain("לוח בקרה");
 
     const logout = await app.request("/logout", {
       method: "POST",
@@ -323,7 +323,7 @@ describe("app routes", () => {
     expect(blockedMockPage.status).toBe(404);
   });
 
-  it("shows Grow mode and missing client requirements on the settings page", async () => {
+  it("shows system status details on the settings page", async () => {
     const { app } = createTestApp();
     const session = await login(app, "test-admin-password");
 
@@ -335,9 +335,9 @@ describe("app routes", () => {
 
     expect(response.status).toBe(200);
     const html = await response.text();
-    expect(html).toContain("GROW_MODE");
+    expect(html).toContain("סטטוס מערכת");
     expect(html).toContain("דמו");
-    expect(html).toContain("דוגמאות payload מאומתות");
+    expect(html).toContain("תצורת הדגמה");
   });
 
   it("returns a clear safe health error when sandbox config is incomplete", async () => {
@@ -507,7 +507,7 @@ describe("app routes", () => {
       headers: { cookie: session.cookie ?? "" }
     });
     expect(dashboard.status).toBe(200);
-    expect(await dashboard.text()).toContain("מצב פיתוח");
+    expect(await dashboard.text()).toContain("סביבת הדגמה פעילה");
 
     const newPaymentPage = await app.request("/admin/payments/new", {
       headers: { cookie: session.cookie ?? "" }
@@ -548,9 +548,7 @@ describe("app routes", () => {
       }
     );
     expect(mockPayPage.status).toBe(200);
-    expect(await mockPayPage.text()).toContain(
-      "עמוד תשלום מדומה — לצורכי פיתוח בלבד"
-    );
+    expect(await mockPayPage.text()).toContain("עמוד תשלום דמו");
   });
 
   it("creates a mock invoice manually only for paid payments and serves mock invoice page", async () => {
@@ -618,8 +616,6 @@ describe("app routes", () => {
       }
     );
     expect(mockInvoicePage.status).toBe(200);
-    expect(await mockInvoicePage.text()).toContain(
-      "מסמך מדומה — לצורכי פיתוח בלבד"
-    );
+    expect(await mockInvoicePage.text()).toContain("מסמך דמו לצפייה");
   });
 });
