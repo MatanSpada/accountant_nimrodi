@@ -10,6 +10,7 @@ import {
   renderPaymentDetailsPage,
   renderPaymentsListPage
 } from "../ui/admin/admin-page";
+import { parseFiltersFromQuery } from "../ui/admin/payment-filters";
 import { AppError } from "../shared/errors/app-error";
 
 function escapeCsvValue(value: string) {
@@ -114,12 +115,34 @@ export function registerAdminRoutes(
   app.get("/admin/payments", async (c) => {
     const container = getContainer(c.env);
     const appConfig = getConfig(c.env);
-    const limit = Number(c.req.query("limit") ?? "20");
-    const offset = Number(c.req.query("offset") ?? "0");
-    const payments = await container.paymentService.listPayments({
-      limit: Number.isFinite(limit) ? limit : 20,
-      offset: Number.isFinite(offset) ? offset : 0
+    const rawLimit = Number(c.req.query("limit") ?? "20");
+    const rawOffset = Number(c.req.query("offset") ?? "0");
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 20;
+    const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
+
+    const filters = parseFiltersFromQuery({
+      status: c.req.query("status"),
+      customer: c.req.query("customer"),
+      from: c.req.query("from"),
+      to: c.req.query("to"),
+      sort: c.req.query("sort"),
+      dir: c.req.query("dir")
     });
+
+    const [payments, customerNames] = await Promise.all([
+      container.paymentService.listPayments({
+        limit,
+        offset,
+        status: filters.status,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        customer: filters.customer,
+        sortBy: filters.sortBy,
+        sortDir: filters.sortDir
+      }),
+      container.paymentRepository.listDistinctCustomerNames(300)
+    ]);
+
     const invoices = await Promise.all(
       payments.items.map((payment) =>
         container.invoiceService.getInvoiceByPaymentId(payment.id)
@@ -133,7 +156,13 @@ export function registerAdminRoutes(
     );
 
     return c.html(
-      renderPaymentsListPage({ appConfig, payments, invoiceByPaymentId })
+      renderPaymentsListPage({
+        appConfig,
+        payments,
+        invoiceByPaymentId,
+        filters,
+        customerNames
+      })
     );
   });
 

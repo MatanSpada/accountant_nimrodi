@@ -39,10 +39,20 @@ export interface AttachInvoiceIdInput {
   updatedAt: string;
 }
 
+export type PaymentSortField =
+  "created_at" | "customer_name" | "amount_agorot" | "status";
+
+export type PaymentSortDir = "asc" | "desc";
+
 export interface PaymentListOptions {
   limit?: number;
   offset?: number;
   status?: PaymentStatus;
+  dateFrom?: string; // ISO yyyy-mm-dd, inclusive
+  dateTo?: string; // ISO yyyy-mm-dd, inclusive
+  customer?: string; // partial match, case-insensitive
+  sortBy?: PaymentSortField;
+  sortDir?: PaymentSortDir;
 }
 
 export interface PaymentListResult {
@@ -65,6 +75,7 @@ export interface PaymentRepository {
   ): Promise<Payment | null>;
   attachInvoiceId(input: AttachInvoiceIdInput): Promise<Payment | null>;
   list(options?: PaymentListOptions): Promise<PaymentListResult>;
+  listDistinctCustomerNames(limit?: number): Promise<string[]>;
   createWebhookRecord(
     input: CreatePaymentWebhookInput
   ): Promise<PaymentWebhookRecord>;

@@ -1,12 +1,22 @@
 import type { InvoiceRecord } from "../../domain/invoices/invoice-types";
 import type { PaymentListResult } from "../../domain/payments/payment-repository";
-import { isFinalPaymentStatus } from "../../domain/payments/payment-status";
+import {
+  isFinalPaymentStatus,
+  PAYMENT_STATUSES
+} from "../../domain/payments/payment-status";
 import type { Payment } from "../../domain/payments/payment-types";
 import type { PaymentWebhookRecord } from "../../domain/payments/payment-webhook-types";
 import type { AppConfig } from "../../shared/config/app-config";
 import { escapeHtml, formatAmountAgorot, formatDateTime } from "./formatters";
 import { getInvoiceStatusLabel } from "./invoice-status-labels";
-import { getPaymentStatusLabel } from "./status-labels";
+import type { ParsedFilters, SortField } from "./payment-filters";
+import {
+  buildChips,
+  buildFilterUrl,
+  buildSortUrl,
+  hasActiveFilters
+} from "./payment-filters";
+import { getPaymentStatusLabel, PAYMENT_STATUS_LABELS } from "./status-labels";
 import { buildWhatsAppLink } from "./whatsapp-helper";
 
 export interface PaymentListItemView {
@@ -1045,6 +1055,185 @@ const CSS = `
     .page-content { padding: 16px; }
     .topbar { padding: 14px 16px; }
   }
+
+  /* ── KPI cards as navigation links ── */
+  a.kpi-card {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    cursor: pointer;
+  }
+
+  a.kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(37,99,235,0.28);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ── Breakdown rows as links ── */
+  a.breakdown-row {
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 4px 8px;
+    margin: -4px -8px;
+    border-radius: var(--radius-sm);
+    transition: background 120ms;
+  }
+
+  a.breakdown-row:hover { background: var(--surface-soft); }
+  a.breakdown-row .b-label { color: var(--ink-soft); transition: color 120ms; }
+  a.breakdown-row:hover .b-label { color: var(--accent); }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    padding: 14px 16px;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    margin-bottom: 14px;
+  }
+
+  .filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .filter-field-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .filter-input {
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.85rem;
+    width: 110px;
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+
+  .filter-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.08);
+  }
+
+  .filter-input-wide { width: 170px; }
+
+  .filter-select {
+    height: 34px;
+    padding: 0 8px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: border-color 150ms;
+  }
+
+  .filter-select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .filter-actions {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    margin-right: auto;
+  }
+
+  .filter-error {
+    font-size: 0.7rem;
+    color: var(--danger);
+    line-height: 1.3;
+  }
+
+  /* ── Active filter chips ── */
+  .chips-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px 4px 6px;
+    background: var(--accent-soft);
+    border: 1px solid rgba(37,99,235,0.2);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    color: #1d4ed8;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .chip-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(37,99,235,0.14);
+    color: #1d4ed8;
+    font-size: 0.7rem;
+    text-decoration: none;
+    flex-shrink: 0;
+    transition: background 120ms;
+  }
+
+  .chip-x:hover { background: rgba(37,99,235,0.28); color: #1d4ed8; }
+
+  .chips-clear {
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 999px;
+    transition: background 120ms, color 120ms;
+  }
+
+  .chips-clear:hover { background: var(--surface-muted); color: var(--ink-soft); }
+
+  /* ── Sortable column headers ── */
+  .sort-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    text-decoration: none;
+    color: inherit;
+    white-space: nowrap;
+    transition: color 120ms;
+  }
+
+  .sort-link:hover { color: var(--ink); }
+  .sort-link.active { color: var(--accent); }
+
+  .sort-arrow {
+    font-size: 0.65rem;
+    opacity: 0.9;
+  }
 `;
 
 const SHARED_JS = `
@@ -1110,6 +1299,105 @@ const SHARED_JS = `
     }
   });
 `;
+
+// ── Filter bar, chips, and sort header helpers ────────────────────────────────
+
+const BASE_PATH = "/admin/payments";
+
+function renderFilterBar(
+  filters: ParsedFilters,
+  customerNames: string[]
+): string {
+  const clearSortUrl = buildFilterUrl(BASE_PATH, {
+    sortBy: filters.sortBy,
+    sortDir: filters.sortDir
+  });
+  return `
+    <form class="filter-bar" method="GET" action="${BASE_PATH}">
+      <div class="filter-field">
+        <span class="filter-field-label">מתאריך</span>
+        <input class="filter-input" type="text" name="from"
+          value="${escapeHtml(filters.dateFromDisplay ?? "")}"
+          placeholder="dd/mm/yy"
+          autocomplete="off"
+          maxlength="8" />
+        ${filters.dateFromError ? `<span class="filter-error">${escapeHtml(filters.dateFromError)}</span>` : ""}
+      </div>
+      <div class="filter-field">
+        <span class="filter-field-label">עד תאריך</span>
+        <input class="filter-input" type="text" name="to"
+          value="${escapeHtml(filters.dateToDisplay ?? "")}"
+          placeholder="dd/mm/yy"
+          autocomplete="off"
+          maxlength="8" />
+        ${filters.dateToError ? `<span class="filter-error">${escapeHtml(filters.dateToError)}</span>` : ""}
+      </div>
+      <div class="filter-field">
+        <span class="filter-field-label">לקוח</span>
+        <input class="filter-input filter-input-wide" type="text" name="customer"
+          value="${escapeHtml(filters.customer ?? "")}"
+          placeholder="שם לקוח"
+          list="customer-autocomplete"
+          autocomplete="off" />
+        <datalist id="customer-autocomplete">
+          ${customerNames.map((n) => `<option value="${escapeHtml(n)}"></option>`).join("")}
+        </datalist>
+      </div>
+      <div class="filter-field">
+        <span class="filter-field-label">סטטוס</span>
+        <select class="filter-select" name="status">
+          <option value="">הכל</option>
+          ${PAYMENT_STATUSES.map(
+            (s) =>
+              `<option value="${s}"${filters.status === s ? " selected" : ""}>${PAYMENT_STATUS_LABELS[s]}</option>`
+          ).join("")}
+        </select>
+      </div>
+      ${filters.sortBy !== "created_at" ? `<input type="hidden" name="sort" value="${filters.sortBy}" />` : ""}
+      ${filters.sortDir !== "desc" ? `<input type="hidden" name="dir" value="${filters.sortDir}" />` : ""}
+      <div class="filter-actions">
+        <button type="submit" class="btn btn-primary btn-sm">סינון</button>
+        ${hasActiveFilters(filters) ? `<a class="btn btn-ghost btn-sm" href="${escapeHtml(clearSortUrl)}">נקה</a>` : ""}
+      </div>
+    </form>`;
+}
+
+function renderFilterChips(filters: ParsedFilters): string {
+  const chips = buildChips(BASE_PATH, filters, getPaymentStatusLabel);
+  if (chips.length === 0) return "";
+
+  const clearAllUrl = buildFilterUrl(BASE_PATH, {
+    sortBy: filters.sortBy,
+    sortDir: filters.sortDir
+  });
+
+  return `
+    <div class="chips-row">
+      ${chips
+        .map(
+          (chip) => `
+        <span class="chip">
+          ${escapeHtml(chip.label)}
+          <a class="chip-x" href="${escapeHtml(chip.removeUrl)}" title="הסר">×</a>
+        </span>`
+        )
+        .join("")}
+      ${chips.length > 1 ? `<a class="chips-clear" href="${escapeHtml(clearAllUrl)}">נקה הכל</a>` : ""}
+    </div>`;
+}
+
+function renderSortTh(
+  label: string,
+  field: SortField,
+  filters: ParsedFilters
+): string {
+  const isActive = filters.sortBy === field;
+  const url = buildSortUrl(BASE_PATH, filters, field);
+  const arrow = isActive
+    ? `<span class="sort-arrow">${filters.sortDir === "desc" ? "↓" : "↑"}</span>`
+    : "";
+  return `<th><a class="sort-link${isActive ? " active" : ""}" href="${escapeHtml(url)}">${label}${arrow}</a></th>`;
+}
 
 function renderLayout(input: {
   appConfig: AppConfig;
@@ -1224,7 +1512,7 @@ function renderBreakdown(metrics: DashboardMetrics) {
       ${visibleItems
         .map(
           (item) => `
-        <div class="breakdown-row">
+        <a class="breakdown-row" href="${BASE_PATH}?status=${item.status}">
           <div class="breakdown-meta">
             <span class="b-label">${item.label}</span>
             <span class="b-count">${item.count}</span>
@@ -1232,7 +1520,7 @@ function renderBreakdown(metrics: DashboardMetrics) {
           <div class="breakdown-track">
             <div class="breakdown-fill" style="width:${Math.round((item.count / maxCount) * 100)}%"></div>
           </div>
-        </div>`
+        </a>`
         )
         .join("")}
     </div>`;
@@ -1585,21 +1873,21 @@ export function renderDashboardPage(input: {
       <p class="section-label">סקירה כללית</p>
 
       <div class="kpi-row">
-        <div class="kpi-card">
+        <a class="kpi-card" href="${BASE_PATH}">
           <span class="kpi-label">סך בקשות</span>
           <span class="kpi-value">${input.metrics.totalRequests}</span>
           <span class="kpi-sub">כלל העסקאות שנוצרו</span>
-        </div>
-        <div class="kpi-card">
+        </a>
+        <a class="kpi-card" href="${BASE_PATH}?status=paid">
           <span class="kpi-label">שולמו</span>
           <span class="kpi-value success">${input.metrics.paidCount}</span>
           <span class="kpi-sub">עסקאות שאושרו</span>
-        </div>
-        <div class="kpi-card">
+        </a>
+        <a class="kpi-card" href="${BASE_PATH}">
           <span class="kpi-label">ממתינות</span>
           <span class="kpi-value">${input.metrics.pendingCount}</span>
           <span class="kpi-sub">פתוחות לתשלום</span>
-        </div>
+        </a>
         <div class="kpi-card">
           <span class="kpi-label">סכום שנגבה</span>
           <span class="kpi-value accent" style="font-size:1.5rem;">${formatAmountAgorot(input.metrics.paidAmountAgorot)}</span>
@@ -1747,12 +2035,23 @@ export function renderPaymentsListPage(input: {
   appConfig: AppConfig;
   payments: PaymentListResult;
   invoiceByPaymentId: Record<string, InvoiceRecord | null>;
+  filters: ParsedFilters;
+  customerNames: string[];
 }) {
   const previousOffset = Math.max(
     0,
     input.payments.offset - input.payments.limit
   );
   const nextOffset = input.payments.offset + input.payments.limit;
+  const prevUrl = buildFilterUrl(BASE_PATH, input.filters, {
+    limit: input.payments.limit,
+    offset: previousOffset
+  });
+  const nextUrl = buildFilterUrl(BASE_PATH, input.filters, {
+    limit: input.payments.limit,
+    offset: nextOffset
+  });
+  const activeCount = hasActiveFilters(input.filters);
 
   return renderLayout({
     appConfig: input.appConfig,
@@ -1761,20 +2060,22 @@ export function renderPaymentsListPage(input: {
     content: `
       <div class="card">
         <div class="card-header">
-          <h3>כל הבקשות</h3>
+          <h3>כל הבקשות${activeCount ? " · מסוננות" : ""}</h3>
           <div class="btn-row">
             <a class="btn btn-secondary btn-sm" href="/admin/payments/export.csv">ייצוא CSV</a>
             <a class="btn btn-primary btn-sm" href="/admin/payments/new">בקשה חדשה</a>
           </div>
         </div>
+        ${renderFilterBar(input.filters, input.customerNames)}
+        ${renderFilterChips(input.filters)}
         <table class="data-table">
           <thead>
             <tr>
-              <th>תאריך</th>
-              <th>לקוח</th>
+              ${renderSortTh("תאריך", "created_at", input.filters)}
+              ${renderSortTh("לקוח", "customer_name", input.filters)}
               <th>פרטי קשר</th>
-              <th>סכום</th>
-              <th>סטטוס</th>
+              ${renderSortTh("סכום", "amount_agorot", input.filters)}
+              ${renderSortTh("סטטוס", "status", input.filters)}
               <th>מסמך</th>
               <th>קישור</th>
             </tr>
@@ -1790,8 +2091,8 @@ export function renderPaymentsListPage(input: {
           input.payments.offset > 0 || input.payments.hasMore
             ? `
           <div class="pagination">
-            ${input.payments.offset > 0 ? `<a class="btn btn-secondary btn-sm" href="/admin/payments?limit=${input.payments.limit}&offset=${previousOffset}">עמוד קודם</a>` : ""}
-            ${input.payments.hasMore ? `<a class="btn btn-secondary btn-sm" href="/admin/payments?limit=${input.payments.limit}&offset=${nextOffset}">עמוד הבא</a>` : ""}
+            ${input.payments.offset > 0 ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(prevUrl)}">עמוד קודם</a>` : ""}
+            ${input.payments.hasMore ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(nextUrl)}">עמוד הבא</a>` : ""}
           </div>`
             : ""
         }

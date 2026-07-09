@@ -173,11 +173,46 @@ export class InMemoryPaymentRepository implements PaymentRepository {
   }
 
   async list(options: PaymentListOptions = {}): Promise<PaymentListResult> {
-    const limit = Math.max(1, Math.min(options.limit ?? 20, 100));
+    const limit = Math.max(1, Math.min(options.limit ?? 20, 5000));
     const offset = Math.max(0, options.offset ?? 0);
-    const filtered = [...this.payments.values()]
-      .filter((payment) => !options.status || payment.status === options.status)
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
+    const dateFrom = options.dateFrom
+      ? new Date(`${options.dateFrom}T00:00:00Z`)
+      : null;
+    const dateTo = options.dateTo
+      ? new Date(`${options.dateTo}T23:59:59Z`)
+      : null;
+    const customerLower = options.customer?.toLowerCase();
+
+    const filtered = [...this.payments.values()].filter((payment) => {
+      if (options.status && payment.status !== options.status) return false;
+      if (dateFrom && new Date(payment.createdAt) < dateFrom) return false;
+      if (dateTo && new Date(payment.createdAt) > dateTo) return false;
+      if (
+        customerLower &&
+        !payment.customerName.toLowerCase().includes(customerLower)
+      )
+        return false;
+      return true;
+    });
+
+    const sortBy = options.sortBy ?? "created_at";
+    const ascending = options.sortDir === "asc";
+
+    filtered.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === "created_at") {
+        cmp = a.createdAt.localeCompare(b.createdAt);
+      } else if (sortBy === "customer_name") {
+        cmp = a.customerName.localeCompare(b.customerName, "he");
+      } else if (sortBy === "amount_agorot") {
+        cmp = a.amountAgorot - b.amountAgorot;
+      } else if (sortBy === "status") {
+        cmp = a.status.localeCompare(b.status);
+      }
+      return ascending ? cmp : -cmp;
+    });
+
     const page = filtered.slice(offset, offset + limit + 1);
 
     return {
@@ -186,6 +221,16 @@ export class InMemoryPaymentRepository implements PaymentRepository {
       offset,
       hasMore: page.length > limit
     };
+  }
+
+  async listDistinctCustomerNames(limit = 200): Promise<string[]> {
+    const names = new Set<string>();
+    for (const payment of this.payments.values()) {
+      names.add(payment.customerName);
+    }
+    return [...names]
+      .sort((a, b) => a.localeCompare(b, "he"))
+      .slice(0, Math.max(1, limit));
   }
 
   async createWebhookRecord(

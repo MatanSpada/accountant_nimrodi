@@ -123,6 +123,157 @@ describe("InMemoryPaymentRepository", () => {
     ).rejects.toBeInstanceOf(AppError);
   });
 
+  describe("filtering and sorting", () => {
+    async function buildRepo() {
+      const repository = new InMemoryPaymentRepository();
+      const base = {
+        customerPhone: null,
+        customerEmail: null,
+        currency: "ILS" as const,
+        provider: "mock-grow",
+        providerPaymentId: null,
+        providerTransactionId: null,
+        paymentUrl: null,
+        invoiceId: null,
+        externalCrmDealId: null,
+        paidAt: null,
+        cancelledAt: null,
+        failedAt: null
+      };
+      await repository.create({
+        ...base,
+        id: "pay_1",
+        customerName: "ישראל ישראלי",
+        amountAgorot: 10000,
+        description: "חשבון א",
+        status: "paid",
+        createdAt: "2026-07-01T10:00:00.000Z",
+        updatedAt: "2026-07-01T10:00:00.000Z"
+      });
+      await repository.create({
+        ...base,
+        id: "pay_2",
+        customerName: "שרה כהן",
+        amountAgorot: 5000,
+        description: "חשבון ב",
+        status: "pending",
+        createdAt: "2026-07-10T08:00:00.000Z",
+        updatedAt: "2026-07-10T08:00:00.000Z"
+      });
+      await repository.create({
+        ...base,
+        id: "pay_3",
+        customerName: "ישראל לוי",
+        amountAgorot: 20000,
+        description: "חשבון ג",
+        status: "paid",
+        createdAt: "2026-07-15T12:00:00.000Z",
+        updatedAt: "2026-07-15T12:00:00.000Z"
+      });
+      return repository;
+    }
+
+    it("filters by status=paid", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({ status: "paid" });
+      expect(result.items).toHaveLength(2);
+      expect(result.items.every((p) => p.status === "paid")).toBe(true);
+    });
+
+    it("filters by dateFrom (inclusive)", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({ dateFrom: "2026-07-10" });
+      expect(result.items.map((p) => p.id).sort()).toEqual(["pay_2", "pay_3"]);
+    });
+
+    it("filters by dateTo (inclusive)", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({ dateTo: "2026-07-10" });
+      expect(result.items.map((p) => p.id).sort()).toEqual(["pay_1", "pay_2"]);
+    });
+
+    it("filters by date range", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({
+        dateFrom: "2026-07-10",
+        dateTo: "2026-07-10"
+      });
+      expect(result.items.map((p) => p.id)).toEqual(["pay_2"]);
+    });
+
+    it("filters by partial customer name (case-insensitive)", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({ customer: "ישראל" });
+      expect(result.items.map((p) => p.id).sort()).toEqual(["pay_1", "pay_3"]);
+    });
+
+    it("combines status and customer filters", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({ status: "paid", customer: "לוי" });
+      expect(result.items.map((p) => p.id)).toEqual(["pay_3"]);
+    });
+
+    it("sorts by amount_agorot ascending", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({
+        sortBy: "amount_agorot",
+        sortDir: "asc"
+      });
+      expect(result.items.map((p) => p.amountAgorot)).toEqual([
+        5000, 10000, 20000
+      ]);
+    });
+
+    it("sorts by amount_agorot descending", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({
+        sortBy: "amount_agorot",
+        sortDir: "desc"
+      });
+      expect(result.items.map((p) => p.amountAgorot)).toEqual([
+        20000, 10000, 5000
+      ]);
+    });
+
+    it("sorts by created_at ascending", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({
+        sortBy: "created_at",
+        sortDir: "asc"
+      });
+      expect(result.items.map((p) => p.id)).toEqual([
+        "pay_1",
+        "pay_2",
+        "pay_3"
+      ]);
+    });
+
+    it("defaults to created_at desc", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({});
+      expect(result.items.map((p) => p.id)).toEqual([
+        "pay_3",
+        "pay_2",
+        "pay_1"
+      ]);
+    });
+
+    it("listDistinctCustomerNames returns sorted unique names", async () => {
+      const repo = await buildRepo();
+      const names = await repo.listDistinctCustomerNames();
+      expect(names).toContain("ישראל ישראלי");
+      expect(names).toContain("ישראל לוי");
+      expect(names).toContain("שרה כהן");
+      expect(names.length).toBe(3);
+    });
+
+    it("listDistinctCustomerNames respects limit", async () => {
+      const repo = await buildRepo();
+      const names = await repo.listDistinctCustomerNames(2);
+      expect(names.length).toBe(2);
+    });
+  });
+
   it("stores webhook payloads and marks processing results", async () => {
     const repository = new InMemoryPaymentRepository();
 

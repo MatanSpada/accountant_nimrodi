@@ -387,72 +387,60 @@ export class D1PaymentRepository implements PaymentRepository {
   }
 
   async list(options: PaymentListOptions = {}): Promise<PaymentListResult> {
-    const limit = Math.max(1, Math.min(options.limit ?? 20, 100));
+    const limit = Math.max(1, Math.min(options.limit ?? 20, 5000));
     const offset = Math.max(0, options.offset ?? 0);
-    const statement = options.status
-      ? this.db
-          .prepare(
-            `
-              SELECT
-                id,
-                customer_id,
-                customer_name,
-                customer_phone,
-                customer_email,
-                amount_agorot,
-                currency,
-                description,
-                status,
-                provider,
-                provider_payment_id,
-                provider_transaction_id,
-                payment_url,
-                invoice_id,
-                external_crm_deal_id,
-                created_at,
-                updated_at,
-                paid_at,
-                cancelled_at,
-                failed_at
-              FROM payments
-              WHERE status = ?
-              ORDER BY created_at DESC
-              LIMIT ? OFFSET ?
-            `
-          )
-          .bind(options.status, limit + 1, offset)
-      : this.db
-          .prepare(
-            `
-              SELECT
-                id,
-                customer_id,
-                customer_name,
-                customer_phone,
-                customer_email,
-                amount_agorot,
-                currency,
-                description,
-                status,
-                provider,
-                provider_payment_id,
-                provider_transaction_id,
-                payment_url,
-                invoice_id,
-                external_crm_deal_id,
-                created_at,
-                updated_at,
-                paid_at,
-                cancelled_at,
-                failed_at
-              FROM payments
-              ORDER BY created_at DESC
-              LIMIT ? OFFSET ?
-            `
-          )
-          .bind(limit + 1, offset);
 
-    const result = await statement.all<D1PaymentRow>();
+    const sortFieldMap: Record<string, string> = {
+      created_at: "created_at",
+      customer_name: "customer_name",
+      amount_agorot: "amount_agorot",
+      status: "status"
+    };
+    const sortField =
+      sortFieldMap[options.sortBy ?? "created_at"] ?? "created_at";
+    const sortDir = options.sortDir === "asc" ? "ASC" : "DESC";
+
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (options.status) {
+      conditions.push("status = ?");
+      params.push(options.status);
+    }
+    if (options.dateFrom) {
+      conditions.push("DATE(created_at) >= ?");
+      params.push(options.dateFrom);
+    }
+    if (options.dateTo) {
+      conditions.push("DATE(created_at) <= ?");
+      params.push(options.dateTo);
+    }
+    if (options.customer) {
+      conditions.push("LOWER(customer_name) LIKE ?");
+      params.push(`%${options.customer.toLowerCase()}%`);
+    }
+
+    const where =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const sql = `
+      SELECT
+        id, customer_id, customer_name, customer_phone, customer_email,
+        amount_agorot, currency, description, status, provider,
+        provider_payment_id, provider_transaction_id, payment_url,
+        invoice_id, external_crm_deal_id, created_at, updated_at,
+        paid_at, cancelled_at, failed_at
+      FROM payments
+      ${where}
+      ORDER BY ${sortField} ${sortDir}
+      LIMIT ? OFFSET ?
+    `;
+
+    const result = await this.db
+      .prepare(sql)
+      .bind(...params, limit + 1, offset)
+      .all<D1PaymentRow>();
+
     const rows = result.results ?? [];
 
     return {
@@ -461,6 +449,22 @@ export class D1PaymentRepository implements PaymentRepository {
       offset,
       hasMore: rows.length > limit
     };
+  }
+
+  async listDistinctCustomerNames(limit = 200): Promise<string[]> {
+    const result = await this.db
+      .prepare(
+        `
+          SELECT DISTINCT customer_name
+          FROM payments
+          ORDER BY customer_name
+          LIMIT ?
+        `
+      )
+      .bind(Math.max(1, limit))
+      .all<{ customer_name: string }>();
+
+    return (result.results ?? []).map((r) => r.customer_name);
   }
 
   async createWebhookRecord(
