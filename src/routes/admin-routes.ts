@@ -28,7 +28,21 @@ export function registerAdminRoutes(
     const container = getContainer(c.env);
     const appConfig = getConfig(c.env);
     const payments = await container.paymentService.listPayments({ limit: 20 });
-    return c.html(renderDashboardPage({ appConfig, payments: payments.items }));
+    const invoices = await Promise.all(
+      payments.items.map((payment) =>
+        container.invoiceService.getInvoiceByPaymentId(payment.id)
+      )
+    );
+
+    return c.html(
+      renderDashboardPage({
+        appConfig,
+        payments: payments.items.map((payment, index) => ({
+          payment,
+          invoice: invoices[index] ?? null
+        }))
+      })
+    );
   });
 
   app.get("/admin/payments/new", (c) => {
@@ -60,8 +74,21 @@ export function registerAdminRoutes(
       limit: Number.isFinite(limit) ? limit : 20,
       offset: Number.isFinite(offset) ? offset : 0
     });
+    const invoices = await Promise.all(
+      payments.items.map((payment) =>
+        container.invoiceService.getInvoiceByPaymentId(payment.id)
+      )
+    );
+    const invoiceByPaymentId = Object.fromEntries(
+      payments.items.map((payment, index) => [
+        payment.id,
+        invoices[index] ?? null
+      ])
+    );
 
-    return c.html(renderPaymentsListPage({ appConfig, payments }));
+    return c.html(
+      renderPaymentsListPage({ appConfig, payments, invoiceByPaymentId })
+    );
   });
 
   app.get("/admin/payments/export.csv", async (c) => {

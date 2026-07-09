@@ -336,8 +336,8 @@ describe("app routes", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain("GROW_MODE");
-    expect(html).toContain("mock");
-    expect(html).toContain("payloads מאומתים של webhook מ-sandbox");
+    expect(html).toContain("דמו");
+    expect(html).toContain("דוגמאות payload מאומתות");
   });
 
   it("returns a clear safe health error when sandbox config is incomplete", async () => {
@@ -529,7 +529,7 @@ describe("app routes", () => {
     const detailHtml = await detailPage.text();
     expect(detailHtml).toContain("פתיחת WhatsApp");
     expect(detailHtml).toContain("התנתקות");
-    expect(detailHtml).toContain("קבלה / מסמך");
+    expect(detailHtml).toContain("מסמך דמו");
 
     const paymentApiResponse = await app.request(
       `/api/payments/${createPayload.payment.id}`,

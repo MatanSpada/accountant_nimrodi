@@ -10,6 +10,11 @@ import { getInvoiceStatusLabel } from "./invoice-status-labels";
 import { getPaymentStatusLabel } from "./status-labels";
 import { buildWhatsAppLink } from "./whatsapp-helper";
 
+interface PaymentListItemView {
+  payment: Payment;
+  invoice: InvoiceRecord | null;
+}
+
 function renderLayout(input: {
   appConfig: AppConfig;
   title: string;
@@ -78,6 +83,10 @@ function renderLayout(input: {
         a { color: var(--brand); }
         .layout { min-height: 100vh; display: grid; grid-template-columns: 290px minmax(0, 1fr); }
         .sidebar {
+          position: sticky;
+          top: 0;
+          align-self: start;
+          min-height: 100vh;
           padding: 32px 24px;
           background: linear-gradient(180deg, #203349 0%, #162432 100%);
           color: #f5f3ef;
@@ -350,9 +359,33 @@ function renderLayout(input: {
           color: #6b4d25;
           line-height: 1.6;
         }
-        .copy-feedback {
-          color: var(--success);
-          font-size: 0.95rem;
+        .copy-toast-anchor {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+        }
+        .copy-toast {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          min-width: 170px;
+          padding: 10px 12px;
+          border-radius: 12px;
+          background: rgba(31, 42, 55, 0.94);
+          color: #fff;
+          font-size: 0.9rem;
+          line-height: 1.4;
+          box-shadow: 0 10px 24px rgba(24, 35, 52, 0.2);
+          opacity: 0;
+          transform: translateY(-4px);
+          pointer-events: none;
+          transition: opacity 180ms ease, transform 180ms ease;
+          z-index: 10;
+          white-space: nowrap;
+        }
+        .copy-toast.is-visible {
+          opacity: 1;
+          transform: translateY(0);
         }
         .webhook-list {
           display: grid;
@@ -383,6 +416,10 @@ function renderLayout(input: {
           .layout, .grid, .stats, .form-grid.two-columns, .details-grid {
             grid-template-columns: 1fr;
           }
+          .sidebar {
+            position: static;
+            min-height: auto;
+          }
           .sidebar, main { padding: 20px; }
         }
       </style>
@@ -407,7 +444,7 @@ function renderLayout(input: {
               .join("")}
           </nav>
           <div class="sidebar-note">
-            המערכת בנויה לעבודה מודולרית מול GROW ו-provider קבלות. גם כאשר נוסיף GROW אמיתי, ה-mock flow נשאר זמין לפיתוח ולבדיקות בטוחות.
+            המערכת בנויה לעבודה מודולרית מול GROW ועם ספק מסמכים. גם כאשר נוסיף GROW אמיתי, זרימת הדמו נשארת זמינה לפיתוח ולבדיקות בטוחות.
           </div>
         </aside>
         <main>
@@ -422,7 +459,7 @@ function renderLayout(input: {
             <div class="topbar-actions">
               ${
                 input.appConfig.appEnv !== "production"
-                  ? `<span class="env-pill">סביבה: ${escapeHtml(input.appConfig.appEnv)}</span>`
+                  ? `<span class="env-pill">סביבה: ${escapeHtml(getEnvironmentLabel(input.appConfig.appEnv))}</span>`
                   : ""
               }
               <form method="post" action="/logout">
@@ -447,16 +484,32 @@ function renderLayout(input: {
 
           const feedbackId = button.getAttribute("data-copy-feedback");
           const feedback = feedbackId ? document.getElementById(feedbackId) : null;
+          if (!(feedback instanceof HTMLElement)) return;
+
+          if (feedback.dataset.timeoutId) {
+            window.clearTimeout(Number(feedback.dataset.timeoutId));
+          }
+
+          const showToast = (message) => {
+            feedback.textContent = message;
+            feedback.classList.add("is-visible");
+
+            const timeoutId = window.setTimeout(() => {
+              feedback.classList.remove("is-visible");
+            }, 2000);
+
+            feedback.dataset.timeoutId = String(timeoutId);
+          };
 
           try {
             if (navigator.clipboard?.writeText) {
               await navigator.clipboard.writeText(text);
-              if (feedback) feedback.textContent = "הקישור הועתק.";
+              showToast("הקישור הועתק");
             } else {
-              if (feedback) feedback.textContent = "העתקה אוטומטית לא נתמכת בדפדפן זה.";
+              showToast("העתקה אוטומטית לא נתמכת בדפדפן זה");
             }
           } catch (error) {
-            if (feedback) feedback.textContent = "לא ניתן היה להעתיק את הקישור.";
+            showToast("לא ניתן היה להעתיק את הקישור");
           }
         });
 
@@ -490,7 +543,7 @@ function renderLayout(input: {
               query = new URLSearchParams({
                 simulator_outcome: String(data.outcome || "failed"),
                 simulator_message: String(
-                  data.message || "סימולציית ה-webhook הסתיימה."
+                  data.message || "סימולציית הוובהוק הסתיימה."
                 )
               });
             } else {
@@ -521,7 +574,7 @@ function renderLayout(input: {
               error instanceof Error
                 ? error.message
                 : target.hasAttribute("data-mock-webhook-form")
-                  ? "לא ניתן היה לשלוח את ה-webhook המדומה."
+                  ? "לא ניתן היה לשלוח את הוובהוק המדומה."
                   : "לא ניתן היה ליצור קבלה מדומה.";
             const redirectBase =
               target.getAttribute("data-redirect") || window.location.pathname;
@@ -549,18 +602,20 @@ function renderSystemBanners(appConfig: AppConfig) {
   }
 
   if (appConfig.growMode === "sandbox") {
-    banners.push("מצב בדיקות GROW: יצירת בקשות תשלום נשלחת ל-GROW sandbox.");
+    banners.push(
+      "מצב בדיקות GROW: יצירת בקשות תשלום נשלחת לסביבת הבדיקות של GROW."
+    );
   }
 
   if (appConfig.invoiceMode === "mock") {
     banners.push(
-      "מסמכים עדיין במצב mock. אין כאן עדיין חיבור אמיתי לספק קבלות או מסמכים."
+      "מסמכים עדיין במצב דמו. אין כאן עדיין חיבור אמיתי לספק קבלות או מסמכים."
     );
   }
 
   if (appConfig.enableDevTools) {
     banners.push(
-      "כלי פיתוח פעילים: סימולטורים ועמודי mock נגישים למשתמשי הניהול בלבד."
+      "כלי פיתוח פעילים: סימולטורים ועמודי דמו נגישים למשתמשי הניהול בלבד."
     );
   }
 
@@ -577,29 +632,41 @@ function renderSystemBanners(appConfig: AppConfig) {
 
 function getGrowModeLabel(appConfig: AppConfig) {
   if (appConfig.growMode === "mock") {
-    return "mock";
+    return "דמו";
   }
 
   if (appConfig.growMode === "sandbox") {
-    return "sandbox";
+    return "סביבת בדיקות";
   }
 
-  return "production";
+  return "ייצור";
+}
+
+function getEnvironmentLabel(appEnv: AppConfig["appEnv"]) {
+  if (appEnv === "development") {
+    return "פיתוח";
+  }
+
+  if (appEnv === "staging") {
+    return "בדיקות";
+  }
+
+  return "ייצור";
 }
 
 function getBankTransferOnlyLabel(appConfig: AppConfig) {
   if (appConfig.growStatus.bankTransferOnlyStatus === "requested_unverified") {
-    return "הוגדר flag לבקשת bank-transfer-only, אבל התמיכה בשדה עדיין לא מאומתת ולכן הוא לא נשלח ל-GROW.";
+    return "הוגדר דגל לבקשת העברה בנקאית בלבד, אבל התמיכה בשדה עדיין לא מאומתת ולכן הוא לא נשלח ל-GROW.";
   }
 
-  return "לא התבקש bank-transfer-only ברמת config.";
+  return "לא הוגדרה כרגע בקשה להעברה בנקאית בלבד ברמת התצורה.";
 }
 
 function renderSimulatorForms(payment: Payment, redirectPath: string) {
   if (isFinalPaymentStatus(payment.status)) {
     return `
       <div class="note">
-        העסקה כבר נמצאת בסטטוס סופי. כדי לבדוק duplicate-safe behavior אפשר לשלוח שוב את אותו event_id דרך ה-API או דרך עמוד התשלום המדומה.
+        העסקה כבר נמצאת בסטטוס סופי. כדי לבדוק התנהגות בטוחה מול כפילויות אפשר לשלוח שוב את אותו מזהה אירוע דרך ה-API או דרך עמוד התשלום המדומה.
       </div>
     `;
   }
@@ -646,7 +713,7 @@ function renderWebhookRecords(webhooks: PaymentWebhookRecord[]) {
   if (webhooks.length === 0) {
     return `
       <div class="empty-state">
-        עדיין לא התקבלו webhook-ים עבור העסקה הזאת.
+        עדיין לא התקבלו אירועי וובהוק עבור העסקה הזאת.
       </div>
     `;
   }
@@ -658,12 +725,12 @@ function renderWebhookRecords(webhooks: PaymentWebhookRecord[]) {
           (webhook) => `
             <div class="webhook-item">
               <div class="webhook-meta">
-                <span class="status-badge">${escapeHtml(webhook.eventType)}</span>
-                <span class="status-badge">${escapeHtml(webhook.processingStatus)}</span>
+                <span class="status-badge">${escapeHtml(getWebhookEventLabel(webhook.eventType))}</span>
+                <span class="status-badge">${escapeHtml(getWebhookProcessingStatusLabel(webhook.processingStatus))}</span>
                 <span>${formatDateTime(webhook.receivedAt)}</span>
               </div>
-              <div><strong>Provider event ID</strong> ${escapeHtml(webhook.providerEventId ?? "—")}</div>
-              <div><strong>Provider transaction ID</strong> ${escapeHtml(webhook.providerTransactionId ?? "—")}</div>
+              <div><strong>מזהה אירוע אצל הספק</strong> ${escapeHtml(webhook.providerEventId ?? "—")}</div>
+              <div><strong>מזהה עסקה אצל הספק</strong> ${escapeHtml(webhook.providerTransactionId ?? "—")}</div>
               <div><strong>עובד בתאריך</strong> ${formatDateTime(webhook.processedAt)}</div>
               ${
                 webhook.processingError
@@ -678,13 +745,34 @@ function renderWebhookRecords(webhooks: PaymentWebhookRecord[]) {
   `;
 }
 
-function renderInvoiceIndicator(payment: Payment) {
-  return payment.invoiceId ? "קבלה נוצרה" : "אין קבלה";
+function getWebhookProcessingStatusLabel(
+  status: PaymentWebhookRecord["processingStatus"]
+) {
+  if (status === "processed") {
+    return "עובד";
+  }
+
+  if (status === "failed") {
+    return "נכשל";
+  }
+
+  return status;
+}
+
+function getWebhookEventLabel(eventType: string) {
+  const labels: Record<string, string> = {
+    "payment.paid": "תשלום שולם",
+    "payment.failed": "תשלום נכשל",
+    "payment.cancelled": "תשלום בוטל",
+    "payment.expired": "תשלום פג תוקף"
+  };
+
+  return labels[eventType] ?? eventType;
 }
 
 function getProviderModeIndicator(provider: string) {
   if (provider === "mock-grow" || provider === "mock_grow") {
-    return "Mock";
+    return "דמו";
   }
 
   if (provider === "grow") {
@@ -707,7 +795,7 @@ function renderInvoiceSection(input: {
             <form method="post" data-mock-invoice-form data-endpoint="/api/payments/${escapeHtml(input.payment.id)}/invoice/mock" data-redirect="/admin/payments/${escapeHtml(input.payment.id)}">
               <button type="submit">צור/נסה שוב קבלה מדומה</button>
             </form>
-            <div class="note">פעולת retry זמינה רק לצורכי פיתוח ואינה מייצגת flow production סופי.</div>
+            <div class="note">פעולת הניסיון החוזר זמינה רק לצורכי פיתוח ואינה מייצגת תהליך ייצור סופי.</div>
           `
           : ""
       }
@@ -719,14 +807,15 @@ function renderInvoiceSection(input: {
     (input.invoice.status === "failed" || input.invoice.status === "pending");
 
   return `
+    <div class="warning-box">מסמך דמו נוצר לצורכי פיתוח בלבד. זה אינו מסמך חשבונאי או קבלה חוקית.</div>
     <div class="details-grid">
-      <div class="detail"><strong>סטטוס קבלה</strong>${getInvoiceStatusLabel(input.invoice.status)}</div>
-      <div class="detail"><strong>Provider</strong>${escapeHtml(input.invoice.provider)}</div>
+      <div class="detail"><strong>סטטוס מסמך</strong>${getInvoiceStatusLabel(input.invoice.status)}</div>
+      <div class="detail"><strong>ספק</strong>${escapeHtml(getProviderModeIndicator(input.invoice.provider))}</div>
       <div class="detail"><strong>מספר מסמך</strong>${escapeHtml(input.invoice.invoiceNumber ?? "—")}</div>
-      <div class="detail"><strong>Provider Invoice ID</strong>${escapeHtml(input.invoice.providerInvoiceId ?? "—")}</div>
+      <div class="detail"><strong>מזהה מסמך אצל הספק</strong>${escapeHtml(input.invoice.providerInvoiceId ?? "—")}</div>
       <div class="detail"><strong>קישור למסמך</strong>${
         input.invoice.invoiceUrl
-          ? `<a href="${escapeHtml(input.invoice.invoiceUrl)}" target="_blank" rel="noreferrer">פתיחת מסמך מדומה</a>`
+          ? `<a href="${escapeHtml(input.invoice.invoiceUrl)}" target="_blank" rel="noreferrer">פתיחת מסמך דמו</a>`
           : "—"
       }</div>
       <div class="detail"><strong>נוצר בתאריך</strong>${formatDateTime(input.invoice.createdAt)}</div>
@@ -741,15 +830,30 @@ function renderInvoiceSection(input: {
               <button type="submit">צור/נסה שוב קבלה מדומה</button>
             </form>
           </div>
-          <div class="note">המערכת תשאיר את התשלום במצב שולם גם אם הניסיון הבא ליצירת קבלה ייכשל.</div>
+          <div class="note">המערכת תשאיר את התשלום במצב שולם גם אם הניסיון הבא ליצירת מסמך דמו ייכשל.</div>
         `
         : ""
     }
   `;
 }
 
-function renderPaymentRows(payments: Payment[]) {
-  if (payments.length === 0) {
+function renderInvoiceIndicator(
+  payment: Payment,
+  invoice: InvoiceRecord | null
+) {
+  if (!payment.invoiceId) {
+    return "אין קבלה";
+  }
+
+  if (invoice?.invoiceUrl) {
+    return `<a href="${escapeHtml(invoice.invoiceUrl)}" target="_blank" rel="noreferrer">קבלה נוצרה</a>`;
+  }
+
+  return "קבלה נוצרה — בפרטים";
+}
+
+function renderPaymentRows(items: PaymentListItemView[]) {
+  if (items.length === 0) {
     return `
       <tr>
         <td colspan="10">
@@ -759,9 +863,9 @@ function renderPaymentRows(payments: Payment[]) {
     `;
   }
 
-  return payments
+  return items
     .map(
-      (payment) => `
+      ({ payment, invoice }) => `
         <tr>
           <td>${formatDateTime(payment.createdAt)}</td>
           <td>${escapeHtml(payment.customerName)}</td>
@@ -769,7 +873,7 @@ function renderPaymentRows(payments: Payment[]) {
           <td>${escapeHtml(payment.customerEmail ?? "—")}</td>
           <td>${formatAmountAgorot(payment.amountAgorot)}</td>
           <td><span class="status-badge">${getPaymentStatusLabel(payment.status)}</span></td>
-          <td>${renderInvoiceIndicator(payment)}</td>
+          <td>${renderInvoiceIndicator(payment, invoice)}</td>
           <td>${escapeHtml(getProviderModeIndicator(payment.provider))}</td>
           <td>${
             payment.paymentUrl
@@ -868,7 +972,7 @@ export function renderLoginPage(input: {
         ${input.errorMessage ? `<div class="error">${escapeHtml(input.errorMessage)}</div>` : ""}
         ${
           input.appConfig.appEnv !== "production"
-            ? `<div class="note">סביבה נוכחית: ${escapeHtml(input.appConfig.appEnv)}. סיסמת ברירת המחדל המקומית מתועדת ב-README רק לשימוש פיתוח.</div>`
+            ? `<div class="note">סביבה נוכחית: ${escapeHtml(getEnvironmentLabel(input.appConfig.appEnv))}. סיסמת ברירת המחדל המקומית מתועדת ב-README רק לשימוש פיתוח.</div>`
             : ""
         }
         <form method="post" action="/login">
@@ -886,7 +990,7 @@ export function renderLoginPage(input: {
 
 export function renderDashboardPage(input: {
   appConfig: AppConfig;
-  payments: Payment[];
+  payments: PaymentListItemView[];
 }) {
   return renderLayout({
     appConfig: input.appConfig,
@@ -904,7 +1008,7 @@ export function renderDashboardPage(input: {
           <div class="quick-links">
             <a href="/admin/payments/new">
               <strong>יצירת בקשת תשלום</strong>
-              <span>פתיחת טופס והפקת קישור mock חדש.</span>
+              <span>פתיחת טופס והפקת קישור דמו חדש.</span>
             </a>
             <a href="/admin/payments">
               <strong>עסקאות</strong>
@@ -912,13 +1016,13 @@ export function renderDashboardPage(input: {
             </a>
             <a href="/admin/settings/client-requirements">
               <strong>הגדרות / דרישות חסרות</strong>
-              <span>מה עדיין חסר מהלקוח לפני מעבר ל-production.</span>
+              <span>מה עדיין חסר מהלקוח לפני מעבר לייצור.</span>
             </a>
           </div>
         </div>
         <div class="card">
           <h3>תמונת מצב</h3>
-          <p>המערכת מחוברת ל-D1 ויכולה לפעול במצב mock או מול GROW, לפי ה-config המאומת הזמין כרגע.</p>
+          <p>המערכת מחוברת ל-D1 ויכולה לפעול במצב דמו או מול GROW, לפי התצורה המאומתת הזמינה כרגע.</p>
           <div class="stats">
             <div class="stat">
               <strong>${input.payments.length}</strong>
@@ -926,11 +1030,11 @@ export function renderDashboardPage(input: {
             </div>
             <div class="stat">
               <strong>${escapeHtml(getGrowModeLabel(input.appConfig))}</strong>
-              provider פעיל
+              ספק פעיל
             </div>
             <div class="stat">
               <strong>D1</strong>
-              persistence פעיל
+              שכבת שמירה פעילה
             </div>
           </div>
         </div>
@@ -948,7 +1052,7 @@ export function renderDashboardPage(input: {
               <th>סכום</th>
               <th>סטטוס</th>
               <th>קבלה</th>
-              <th>Provider</th>
+              <th>ספק</th>
               <th>קישור</th>
               <th>פעולה</th>
             </tr>
@@ -975,7 +1079,7 @@ export function renderNewPaymentPage(input: {
     content: `
       <section class="hero">
         <h2>יצירת בקשת תשלום</h2>
-        <p>המערכת תיצור קישור mock ותשמור את העסקה ב-D1. לאחר היצירה יוצגו פרטי הקישור, מזהי ה-provider וכפתורי העתקה ו-WhatsApp.</p>
+        <p>המערכת תיצור קישור דמו ותשמור את העסקה ב-D1. לאחר היצירה יוצגו פרטי הקישור, מזהי הספק וכפתורי העתקה ו-WhatsApp.</p>
       </section>
       <section class="card">
         <h3>פרטי הבקשה</h3>
@@ -1014,7 +1118,7 @@ export function renderNewPaymentPage(input: {
             <button type="submit">יצירת בקשת תשלום</button>
             <a class="button secondary" href="/admin/payments">מעבר לרשימת עסקאות</a>
           </div>
-          <div class="note">אם JavaScript פעיל, השליחה תתבצע דרך ה-API ותעביר אוטומטית לעמוד פרטי העסקה שנוצרה.</div>
+        <div class="note">אם JavaScript פעיל, השליחה תתבצע דרך ה-API ותעביר אוטומטית לעמוד פרטי העסקה שנוצרה.</div>
         </form>
       </section>
       <script>
@@ -1057,6 +1161,7 @@ export function renderNewPaymentPage(input: {
 export function renderPaymentsListPage(input: {
   appConfig: AppConfig;
   payments: PaymentListResult;
+  invoiceByPaymentId: Record<string, InvoiceRecord | null>;
 }) {
   const previousOffset = Math.max(
     0,
@@ -1089,12 +1194,17 @@ export function renderPaymentsListPage(input: {
               <th>סכום</th>
               <th>סטטוס</th>
               <th>קבלה</th>
-              <th>Provider</th>
+              <th>ספק</th>
               <th>קישור</th>
               <th>פעולה</th>
             </tr>
           </thead>
-          <tbody>${renderPaymentRows(input.payments.items)}</tbody>
+          <tbody>${renderPaymentRows(
+            input.payments.items.map((payment) => ({
+              payment,
+              invoice: input.invoiceByPaymentId[payment.id] ?? null
+            }))
+          )}</tbody>
         </table>
         <div class="todo">TODO: להוסיף סינון לפי סטטוס, טווח תאריכים ופרטי לקוח כאשר נצבור יותר עסקאות.</div>
         <div class="pagination">
@@ -1140,7 +1250,7 @@ export function renderPaymentDetailsPage(input: {
     content: `
       <section class="hero">
         <h2>פרטי בקשת תשלום</h2>
-        <p>אפשר להעתיק את הקישור, לפתוח הודעת WhatsApp ידנית, ולעיין בפרטי העסקה ובאירועי ה-webhook שנשמרו במערכת.</p>
+        <p>אפשר להעתיק את הקישור, לפתוח הודעת WhatsApp ידנית, ולעיין בפרטי העסקה ובאירועי הוובהוק שנשמרו במערכת.</p>
       </section>
       <div class="card-stack">
         <section class="card">
@@ -1165,17 +1275,17 @@ export function renderPaymentDetailsPage(input: {
           <h3>${escapeHtml(input.payment.customerName)}</h3>
           <p><span class="status-badge">${getPaymentStatusLabel(input.payment.status)}</span></p>
           <div class="details-grid">
-            <div class="detail"><strong>Payment ID</strong>${escapeHtml(input.payment.id)}</div>
+            <div class="detail"><strong>מזהה תשלום</strong>${escapeHtml(input.payment.id)}</div>
             <div class="detail"><strong>סכום</strong>${formatAmountAgorot(input.payment.amountAgorot)}</div>
             <div class="detail"><strong>תיאור</strong>${escapeHtml(input.payment.description)}</div>
             <div class="detail"><strong>טלפון</strong>${escapeHtml(input.payment.customerPhone ?? "—")}</div>
             <div class="detail"><strong>אימייל</strong>${escapeHtml(input.payment.customerEmail ?? "—")}</div>
             <div class="detail"><strong>סטטוס פנימי</strong>${escapeHtml(input.payment.status)}</div>
             <div class="detail"><strong>סטטוס להצגה</strong>${getPaymentStatusLabel(input.payment.status)}</div>
-            <div class="detail"><strong>Provider</strong>${escapeHtml(input.payment.provider)}</div>
-            <div class="detail"><strong>Provider Payment ID</strong>${escapeHtml(input.payment.providerPaymentId ?? "—")}</div>
-            <div class="detail"><strong>Provider Transaction ID</strong>${escapeHtml(input.payment.providerTransactionId ?? "—")}</div>
-            <div class="detail"><strong>Invoice ID</strong>${escapeHtml(input.payment.invoiceId ?? "—")}</div>
+            <div class="detail"><strong>ספק</strong>${escapeHtml(getProviderModeIndicator(input.payment.provider))}</div>
+            <div class="detail"><strong>מזהה תשלום אצל הספק</strong>${escapeHtml(input.payment.providerPaymentId ?? "—")}</div>
+            <div class="detail"><strong>מזהה עסקה אצל הספק</strong>${escapeHtml(input.payment.providerTransactionId ?? "—")}</div>
+            <div class="detail"><strong>מזהה מסמך</strong>${escapeHtml(input.payment.invoiceId ?? "—")}</div>
             <div class="detail"><strong>נוצר בתאריך</strong>${formatDateTime(input.payment.createdAt)}</div>
             <div class="detail"><strong>עודכן בתאריך</strong>${formatDateTime(input.payment.updatedAt)}</div>
             <div class="detail"><strong>שולם בתאריך</strong>${formatDateTime(input.payment.paidAt)}</div>
@@ -1191,14 +1301,16 @@ export function renderPaymentDetailsPage(input: {
             ${
               input.payment.paymentUrl
                 ? `
-                  <button
-                    type="button"
-                    data-copy-text="${escapeHtml(input.payment.paymentUrl)}"
-                    data-copy-feedback="copy-feedback"
-                  >
-                    העתקת קישור
-                  </button>
-                  <span id="copy-feedback" class="copy-feedback" aria-live="polite"></span>
+                  <span class="copy-toast-anchor">
+                    <button
+                      type="button"
+                      data-copy-text="${escapeHtml(input.payment.paymentUrl)}"
+                      data-copy-feedback="copy-feedback"
+                    >
+                      העתקת קישור
+                    </button>
+                    <span id="copy-feedback" class="copy-toast" aria-live="polite"></span>
+                  </span>
                   <a class="button secondary" href="${escapeHtml(input.payment.paymentUrl)}" target="_blank" rel="noreferrer">פתיחת עמוד תשלום מדומה</a>
                 `
                 : ""
@@ -1216,24 +1328,24 @@ export function renderPaymentDetailsPage(input: {
             ? `
               <section class="card">
                 <h3>סימולטור פיתוח — לא GROW אמיתי</h3>
-                <p>הכפתורים למטה שולחים payload מדומה ל-<span class="inline-code">/api/mock-grow/webhook</span> כדי לבדוק את שרשרת העדכון: שמירת webhook, אימות, ועדכון סטטוס התשלום.</p>
+                <p>הכפתורים למטה שולחים נתוני דמו ל-<span class="inline-code">/api/mock-grow/webhook</span> כדי לבדוק את שרשרת העדכון: שמירת וובהוק, אימות, ועדכון סטטוס התשלום.</p>
                 ${renderSimulatorForms(input.payment, `/admin/payments/${input.payment.id}`)}
-                <div class="note">אין כאן schema אמיתי של GROW. המימוש הסופי יתבצע רק לאחר קבלת payloads מאומתים מהחשבון של הלקוח.</div>
+                <div class="note">אין כאן מבנה נתונים אמיתי של GROW. המימוש הסופי יתבצע רק לאחר קבלת דוגמאות payload מאומתות מהחשבון של הלקוח.</div>
               </section>
             `
             : ""
         }
         <section class="card">
-          <h3>קבלה / מסמך</h3>
-          <p>כאשר התשלום מסומן כשולם, המערכת מנסה ליצור מסמך מדומה בדיוק פעם אחת. duplicate webhook לא אמור ליצור מסמך נוסף.</p>
+          <h3>מסמך דמו</h3>
+          <p>כאשר התשלום מסומן כשולם, המערכת מנסה ליצור מסמך דמו בדיוק פעם אחת. וובהוק כפול לא אמור ליצור מסמך נוסף.</p>
           ${renderInvoiceSection({
             payment: input.payment,
             invoice: input.invoice
           })}
         </section>
         <section class="card">
-          <h3>Webhook-ים אחרונים</h3>
-          <p>תצוגת audit פשוטה של אירועי webhook שנשמרו עבור העסקה הזאת.</p>
+          <h3>אירועי וובהוק אחרונים</h3>
+          <p>תצוגת audit פשוטה של אירועי וובהוק שנשמרו עבור העסקה הזאת.</p>
           ${renderWebhookRecords(input.webhooks)}
         </section>
       </div>
@@ -1254,29 +1366,29 @@ export function renderMockGrowPaymentPage(input: {
     content: `
       <section class="hero">
         <h2>עמוד תשלום מדומה — לצורכי פיתוח בלבד</h2>
-        <p>זהו עמוד סימולציה מקומי בלבד. הוא לא משקף את חוויית GROW האמיתית ולא את payload ה-webhook האמיתי.</p>
+        <p>זהו עמוד סימולציה מקומי בלבד. הוא לא משקף את חוויית GROW האמיתית ולא את נתוני הוובהוק האמיתיים.</p>
       </section>
       <div class="card-stack">
         <section class="card">
           <h3>${escapeHtml(input.payment.customerName)}</h3>
           <p><span class="status-badge">${getPaymentStatusLabel(input.payment.status)}</span></p>
           <div class="details-grid">
-            <div class="detail"><strong>Provider Payment ID</strong>${escapeHtml(input.payment.providerPaymentId ?? "—")}</div>
-            <div class="detail"><strong>Provider Transaction ID</strong>${escapeHtml(input.payment.providerTransactionId ?? "—")}</div>
+            <div class="detail"><strong>מזהה תשלום אצל הספק</strong>${escapeHtml(input.payment.providerPaymentId ?? "—")}</div>
+            <div class="detail"><strong>מזהה עסקה אצל הספק</strong>${escapeHtml(input.payment.providerTransactionId ?? "—")}</div>
             <div class="detail"><strong>סכום</strong>${formatAmountAgorot(input.payment.amountAgorot)}</div>
             <div class="detail"><strong>תיאור</strong>${escapeHtml(input.payment.description)}</div>
           </div>
         </section>
         <section class="card">
           <h3>פעולות סימולציה</h3>
-          <p>הכפתורים שולחים webhook מדומה לשרת. זו הדרך שבה בודקים את הזרימה הקריטית בשלב זה.</p>
+          <p>הכפתורים שולחים וובהוק מדומה לשרת. זו הדרך שבה בודקים את הזרימה הקריטית בשלב זה.</p>
           ${renderSimulatorForms(
             input.payment,
             `/dev/mock-grow/pay/${input.payment.providerPaymentId ?? ""}`
           )}
         </section>
         <section class="card">
-          <h3>Webhook-ים אחרונים</h3>
+          <h3>אירועי וובהוק אחרונים</h3>
           ${renderWebhookRecords(input.webhooks)}
           <div class="button-row">
             <a class="button secondary" href="/admin/payments/${input.payment.id}">מעבר לפרטי העסקה במערכת</a>
@@ -1306,8 +1418,8 @@ export function renderMockInvoicePage(input: {
         <h3>${escapeHtml(input.invoice.invoiceNumber ?? input.invoice.id)}</h3>
         <p><span class="status-badge">${getInvoiceStatusLabel(input.invoice.status)}</span></p>
         <div class="details-grid">
-          <div class="detail"><strong>Payment ID</strong>${escapeHtml(input.payment.id)}</div>
-          <div class="detail"><strong>Provider Invoice ID</strong>${escapeHtml(input.invoice.providerInvoiceId ?? "—")}</div>
+          <div class="detail"><strong>מזהה תשלום</strong>${escapeHtml(input.payment.id)}</div>
+          <div class="detail"><strong>מזהה מסמך אצל הספק</strong>${escapeHtml(input.invoice.providerInvoiceId ?? "—")}</div>
           <div class="detail"><strong>לקוח</strong>${escapeHtml(input.payment.customerName)}</div>
           <div class="detail"><strong>סכום</strong>${formatAmountAgorot(input.payment.amountAgorot)}</div>
           <div class="detail"><strong>תיאור</strong>${escapeHtml(input.payment.description)}</div>
@@ -1333,37 +1445,37 @@ export function renderClientRequirementsPage(input: { appConfig: AppConfig }) {
     content: `
       <section class="hero">
         <h2>דרישות חסרות לפני מעבר לאינטגרציה אמיתית</h2>
-        <p>העמוד הזה נשאר גלוי בכוונה כדי לייצר שקיפות לגבי מה עדיין חסר מהלקוח לפני מעבר ל-GROW אמיתי ול-production.</p>
+        <p>העמוד הזה נשאר גלוי בכוונה כדי לייצר שקיפות לגבי מה עדיין חסר מהלקוח לפני מעבר ל-GROW אמיתי ולייצור.</p>
       </section>
       <section class="card">
         <h3>סטטוס GROW נוכחי</h3>
         <ul class="status-list">
           <li><strong>GROW_MODE</strong><br />${escapeHtml(getGrowModeLabel(input.appConfig))}</li>
-          <li><strong>Required config</strong><br />${input.appConfig.growStatus.hasRequiredConfig ? "קיים" : input.appConfig.growMode === "mock" ? "לא נדרש במצב mock" : "חסר"}</li>
-          <li><strong>notifyUrl</strong><br />${input.appConfig.growStatus.hasNotifyUrl ? "מוגדר" : "לא מוגדר"}</li>
-          <li><strong>invoiceNotifyUrl</strong><br />${input.appConfig.growStatus.hasInvoiceNotifyUrl ? "מוגדר" : "לא מוגדר / לא נדרש כרגע"}</li>
-          <li><strong>API key</strong><br />${input.appConfig.growStatus.hasApiKey ? "קיים" : "לא הוגדר. יש להשתמש רק אם החשבון/התיעוד המאומת דורשים אותו."}</li>
-          <li><strong>Bank-transfer-only</strong><br />${escapeHtml(getBankTransferOnlyLabel(input.appConfig))}</li>
+          <li><strong>תצורת חובה</strong><br />${input.appConfig.growStatus.hasRequiredConfig ? "קיים" : input.appConfig.growMode === "mock" ? "לא נדרש במצב דמו" : "חסר"}</li>
+          <li><strong>כתובת עדכון תשלום</strong><br />${input.appConfig.growStatus.hasNotifyUrl ? "מוגדרת" : "לא מוגדרת"}</li>
+          <li><strong>כתובת עדכון מסמך</strong><br />${input.appConfig.growStatus.hasInvoiceNotifyUrl ? "מוגדרת" : "לא מוגדרת / לא נדרשת כרגע"}</li>
+          <li><strong>מפתח API</strong><br />${input.appConfig.growStatus.hasApiKey ? "קיים" : "לא הוגדר. יש להשתמש רק אם החשבון/התיעוד המאומת דורשים אותו."}</li>
+          <li><strong>העברה בנקאית בלבד</strong><br />${escapeHtml(getBankTransferOnlyLabel(input.appConfig))}</li>
         </ul>
         ${
           input.appConfig.growStatus.missingFields.length > 0
-            ? `<div class="warning-box">חסרים שדות config עבור GROW: ${escapeHtml(input.appConfig.growStatus.missingFields.join(", "))}</div>`
+            ? `<div class="warning-box">חסרים שדות תצורה עבור GROW: ${escapeHtml(input.appConfig.growStatus.missingFields.join(", "))}</div>`
             : ""
         }
         ${
           input.appConfig.appEnv === "production" &&
           input.appConfig.growMode === "mock"
-            ? `<div class="warning-box">המערכת רצה ב-production עם mock mode רק כי הוגדר ALLOW_MOCK_GROW_IN_PRODUCTION=true. זה מתאים רק לפריסה זמנית ומבוקרת.</div>`
+            ? `<div class="warning-box">המערכת רצה בייצור עם מצב דמו רק כי הוגדר ALLOW_MOCK_GROW_IN_PRODUCTION=true. זה מתאים רק לפריסה זמנית ומבוקרת.</div>`
             : ""
         }
       </section>
       <section class="card">
-        <h3>Checklist פתוח</h3>
+        <h3>רשימת דרישות פתוחה</h3>
         <ul class="requirements-list">
           ${CLIENT_REQUIREMENTS_ITEMS.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
         </ul>
-        <div class="note">בשלב זה parser אמיתי ל-webhook של GROW עדיין לא קיים. הוא יתווסף רק אחרי קבלת payloads מאומתים מ-sandbox ו/או production.</div>
-        <div class="note">מקום עתידי ללוגו, צבעי מותג ונכסי משרד רשמיים יתווסף רק לאחר קבלת assets מהלקוח.</div>
+        <div class="note">בשלב זה מפענח אמיתי לוובהוק של GROW עדיין לא קיים. הוא יתווסף רק אחרי קבלת דוגמאות payload מאומתות מסביבת בדיקות ו/או מייצור.</div>
+        <div class="note">מקום עתידי ללוגו, צבעי מותג ונכסי משרד רשמיים יתווסף רק לאחר קבלת נכסי מותג מהלקוח.</div>
       </section>
     `
   });
