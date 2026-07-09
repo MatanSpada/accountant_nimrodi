@@ -12,7 +12,7 @@ export function registerHealthRoutes(
       return c.json({
         status: "ok",
         service: "accountant-nimrodi-payments",
-        phase: "7/8",
+        phase: "8/8",
         providerMode: getConfig(c.env).growMode
       });
     } catch (error) {
@@ -20,7 +20,7 @@ export function registerHealthRoutes(
         {
           status: "config_error",
           service: "accountant-nimrodi-payments",
-          phase: "7/8",
+          phase: "8/8",
           error:
             error instanceof AppError ? error.message : "אירעה שגיאת תצורה."
         },

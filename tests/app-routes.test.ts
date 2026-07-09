@@ -120,6 +120,39 @@ describe("app routes", () => {
     );
   });
 
+  it("requires auth for CSV export and returns CSV when authenticated", async () => {
+    const { app } = createTestApp();
+
+    const unauthenticated = await app.request("/admin/payments/export.csv");
+    expect(unauthenticated.status).toBe(302);
+
+    const session = await login(app, "test-admin-password");
+    await app.request("/api/payments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
+      },
+      body: JSON.stringify({
+        customer_name: "לקוח CSV",
+        customer_phone: "0501111222",
+        customer_email: "csv@example.com",
+        amount_shekel: "98.76",
+        description: "יצוא CSV"
+      })
+    });
+
+    const response = await app.request("/admin/payments/export.csv", {
+      headers: {
+        cookie: session.cookie ?? ""
+      }
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/csv");
+    expect(await response.text()).toContain("customer_email");
+  });
+
   it("creates a mocked payment through authenticated APIs and lists it", async () => {
     const { app } = createTestApp();
     const session = await login(app, "test-admin-password");
@@ -329,6 +362,123 @@ describe("app routes", () => {
     expect(payload.status).toBe("config_error");
     expect(payload.error).toContain("GROW_USER_ID");
     expect(payload.error).not.toContain("secret");
+  });
+
+  it("returns safe readiness output in mock mode", async () => {
+    const { app } = createTestApp();
+
+    const response = await app.request("/ready");
+    const payload = await response.text();
+    expect(response.status).toBe(503);
+    expect(payload).toContain('"status":"not_ready"');
+    expect(payload).toContain('"db":"missing_binding"');
+  });
+
+  it("does not expose secrets in readiness config errors", async () => {
+    const app = createApp({
+      getConfig: () =>
+        getAppConfig({
+          APP_ENV: "staging",
+          ADMIN_PASSWORD: "staging-password",
+          SESSION_SECRET: "staging-secret",
+          GROW_MODE: "sandbox",
+          GROW_API_KEY: "very-secret-key",
+          INVOICE_MODE: "mock",
+          ENABLE_DEV_TOOLS: "false"
+        })
+    });
+
+    const response = await app.request("/ready");
+    expect(response.status).toBe(500);
+    const payload = (await response.json()) as { error: string };
+    expect(payload.error).toContain("GROW_USER_ID");
+    expect(payload.error).not.toContain("very-secret-key");
+  });
+
+  it("does not expose mock simulator buttons in production configuration", async () => {
+    const paymentRepository = new InMemoryPaymentRepository();
+    const customerRepository = new InMemoryCustomerRepository();
+    const invoiceRepository = new InMemoryInvoiceRepository();
+    const container = createContainer(undefined, {
+      paymentRepository,
+      customerRepository,
+      invoiceRepository
+    });
+    const config = getAppConfig({
+      APP_ENV: "production",
+      ADMIN_PASSWORD: "prod-password",
+      SESSION_SECRET: "prod-secret",
+      GROW_MODE: "mock",
+      ALLOW_MOCK_GROW_IN_PRODUCTION: "true",
+      INVOICE_MODE: "mock",
+      ENABLE_DEV_TOOLS: "false"
+    });
+    const app = createApp({
+      getContainer: () => container,
+      getConfig: () => config
+    });
+
+    const session = await login(app, "prod-password");
+    const createResponse = await app.request("/api/payments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
+      },
+      body: JSON.stringify({
+        customer_name: "לקוח production",
+        customer_phone: "0500000011",
+        customer_email: "prod@example.com",
+        amount_shekel: "210.00",
+        description: "בדיקת production"
+      })
+    });
+    const createPayload = (await createResponse.json()) as {
+      payment: { id: string };
+    };
+
+    const detailPage = await app.request(
+      `/admin/payments/${createPayload.payment.id}`,
+      {
+        headers: {
+          cookie: session.cookie ?? ""
+        }
+      }
+    );
+    const html = await detailPage.text();
+    expect(html).not.toContain("סימולטור פיתוח — לא GROW אמיתי");
+    expect(html).not.toContain("כלי פיתוח פעילים");
+  });
+
+  it("returns safe 404 responses for unknown routes", async () => {
+    const { app } = createTestApp();
+    const session = await login(app, "test-admin-password");
+
+    const htmlResponse = await app.request("/missing-page", {
+      headers: {
+        cookie: session.cookie ?? ""
+      }
+    });
+    expect(htmlResponse.status).toBe(404);
+    expect(await htmlResponse.text()).toContain("העמוד לא נמצא");
+
+    const apiResponse = await app.request("/api/missing");
+    expect(apiResponse.status).toBe(404);
+    expect(await apiResponse.text()).toContain("הנתיב המבוקש לא נמצא");
+  });
+
+  it("returns safe JSON API errors", async () => {
+    const { app } = createTestApp();
+    const session = await login(app, "test-admin-password");
+
+    const response = await app.request("/api/payments/does-not-exist", {
+      headers: {
+        cookie: session.cookie ?? ""
+      }
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toContain("בקשת התשלום לא נמצאה");
   });
 
   it("renders protected admin pages and mock pages after login", async () => {

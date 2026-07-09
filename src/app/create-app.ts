@@ -9,8 +9,12 @@ import { registerReadyRoutes } from "../routes/ready-routes";
 import { registerWebhookRoutes } from "../routes/webhook-routes";
 import { getAppConfig, type AppConfig } from "../shared/config/app-config";
 import { accessControlMiddleware } from "../middleware/access-control-middleware";
-import { errorMiddleware } from "../middleware/error-middleware";
+import {
+  errorMiddleware,
+  handleAppError
+} from "../middleware/error-middleware";
 import { requestLoggerMiddleware } from "../middleware/request-logger-middleware";
+import { renderStatusPage } from "../ui/admin/admin-page";
 
 export function createApp(options?: {
   getContainer?: (env?: Env) => AppContainer;
@@ -24,6 +28,7 @@ export function createApp(options?: {
 
   app.use("*", requestLoggerMiddleware);
   app.use("*", errorMiddleware);
+  app.onError((error, c) => handleAppError(error, c));
 
   registerHealthRoutes(app, getConfig);
   registerReadyRoutes(app, getConfig);
@@ -32,6 +37,29 @@ export function createApp(options?: {
   registerAdminRoutes(app, getContainer, getConfig);
   registerApiRoutes(app, getContainer);
   registerWebhookRoutes(app, getContainer, getConfig);
+  app.notFound((c) => {
+    if (c.req.path.startsWith("/api/")) {
+      return c.json({ error: "הנתיב המבוקש לא נמצא." }, 404);
+    }
+
+    try {
+      return c.html(
+        renderStatusPage({
+          appConfig: getConfig(c.env),
+          title: "404",
+          headline: "העמוד לא נמצא",
+          message: "הנתיב שביקשת לא קיים במערכת או הוסר.",
+          statusCode: 404
+        }),
+        404
+      );
+    } catch {
+      return c.html(
+        '<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="utf-8" /><title>404</title></head><body><h1>העמוד לא נמצא</h1><p>הנתיב שביקשת לא קיים במערכת או הוסר.</p></body></html>',
+        404
+      );
+    }
+  });
 
   return app;
 }

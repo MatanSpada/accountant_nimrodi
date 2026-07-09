@@ -389,3 +389,24 @@
   - nobody should confuse the page with a valid accounting receipt
 - Tradeoff:
   - the mock page intentionally looks functional but must still be clearly labeled as development-only
+
+## Operational CSV export decision
+
+- I added a simple authenticated CSV export at `/admin/payments/export.csv` instead of a larger reporting subsystem.
+- Meaning:
+  - the office can export operational payment data immediately for review, backup, or manual reconciliation
+  - the feature stays inside the existing admin/auth boundary with no new infrastructure
+- Tradeoff:
+  - the export is intentionally basic and synchronous
+  - larger reporting or filtered exports may need pagination or background jobs later
+
+## Safe HTML and JSON error response decision
+
+- I kept separate safe error behaviors for admin pages and APIs.
+- Meaning:
+  - admin pages return Hebrew HTML error states that fit the internal UI
+  - API routes return JSON without stack traces or secret-bearing config details
+  - the same approach now covers 404, config failures, and unexpected errors
+- Tradeoff:
+  - there is a little more response-handling code in the app shell
+  - future logging/observability integration should preserve the same no-secrets boundary

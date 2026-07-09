@@ -11,6 +11,14 @@ import {
 } from "../ui/admin/admin-page";
 import { AppError } from "../shared/errors/app-error";
 
+function escapeCsvValue(value: string) {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replaceAll('"', '""')}"`;
+  }
+
+  return value;
+}
+
 export function registerAdminRoutes(
   app: Hono<{ Bindings: Env }>,
   getContainer: (env?: Env) => AppContainer,
@@ -54,6 +62,66 @@ export function registerAdminRoutes(
     });
 
     return c.html(renderPaymentsListPage({ appConfig, payments }));
+  });
+
+  app.get("/admin/payments/export.csv", async (c) => {
+    const container = getContainer(c.env);
+    const payments = await container.paymentService.listPayments({
+      limit: 1000,
+      offset: 0
+    });
+    const invoiceRows = await Promise.all(
+      payments.items.map((payment) =>
+        container.invoiceService.getInvoiceByPaymentId(payment.id)
+      )
+    );
+    const rows = payments.items.map((payment, index) => {
+      const invoice = invoiceRows[index];
+      return [
+        payment.createdAt,
+        payment.customerName,
+        payment.customerPhone ?? "",
+        payment.customerEmail ?? "",
+        (payment.amountAgorot / 100).toFixed(2),
+        payment.currency,
+        payment.status,
+        invoice?.status ?? "",
+        payment.provider,
+        payment.providerPaymentId ?? "",
+        payment.providerTransactionId ?? "",
+        invoice?.invoiceNumber ?? "",
+        invoice?.invoiceUrl ?? ""
+      ]
+        .map((value) => escapeCsvValue(value))
+        .join(",");
+    });
+
+    const csv = [
+      [
+        "created_at",
+        "customer_name",
+        "customer_phone",
+        "customer_email",
+        "amount",
+        "currency",
+        "status",
+        "invoice_status",
+        "provider",
+        "provider_payment_id",
+        "provider_transaction_id",
+        "invoice_number",
+        "invoice_url"
+      ].join(","),
+      ...rows
+    ].join("\n");
+
+    c.header("content-type", "text/csv; charset=utf-8");
+    c.header(
+      "content-disposition",
+      'attachment; filename="nimrodi-payments-export.csv"'
+    );
+
+    return c.body(csv);
   });
 
   app.get("/admin/payments/:id", async (c) => {

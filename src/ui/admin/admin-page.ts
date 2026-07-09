@@ -682,6 +682,18 @@ function renderInvoiceIndicator(payment: Payment) {
   return payment.invoiceId ? "קבלה נוצרה" : "אין קבלה";
 }
 
+function getProviderModeIndicator(provider: string) {
+  if (provider === "mock-grow" || provider === "mock_grow") {
+    return "Mock";
+  }
+
+  if (provider === "grow") {
+    return "GROW";
+  }
+
+  return provider;
+}
+
 function renderInvoiceSection(input: {
   payment: Payment;
   invoice: InvoiceRecord | null;
@@ -740,7 +752,7 @@ function renderPaymentRows(payments: Payment[]) {
   if (payments.length === 0) {
     return `
       <tr>
-        <td colspan="8">
+        <td colspan="10">
           <div class="empty-state">עדיין לא נוצרו בקשות תשלום. אפשר להתחיל מיצירת בקשה חדשה.</div>
         </td>
       </tr>
@@ -754,9 +766,11 @@ function renderPaymentRows(payments: Payment[]) {
           <td>${formatDateTime(payment.createdAt)}</td>
           <td>${escapeHtml(payment.customerName)}</td>
           <td>${escapeHtml(payment.customerPhone ?? "—")}</td>
+          <td>${escapeHtml(payment.customerEmail ?? "—")}</td>
           <td>${formatAmountAgorot(payment.amountAgorot)}</td>
           <td><span class="status-badge">${getPaymentStatusLabel(payment.status)}</span></td>
           <td>${renderInvoiceIndicator(payment)}</td>
+          <td>${escapeHtml(getProviderModeIndicator(payment.provider))}</td>
           <td>${
             payment.paymentUrl
               ? `<a href="${escapeHtml(payment.paymentUrl)}" target="_blank" rel="noreferrer">פתיחת קישור</a>`
@@ -930,9 +944,11 @@ export function renderDashboardPage(input: {
               <th>נוצר בתאריך</th>
               <th>לקוח</th>
               <th>טלפון</th>
+              <th>אימייל</th>
               <th>סכום</th>
               <th>סטטוס</th>
               <th>קבלה</th>
+              <th>Provider</th>
               <th>קישור</th>
               <th>פעולה</th>
             </tr>
@@ -1061,6 +1077,7 @@ export function renderPaymentsListPage(input: {
       <section class="card">
         <div class="button-row" style="margin-top: 0; margin-bottom: 10px;">
           <a class="button" href="/admin/payments/new">יצירת בקשת תשלום</a>
+          <a class="button secondary" href="/admin/payments/export.csv">ייצוא CSV</a>
         </div>
         <table>
           <thead>
@@ -1068,9 +1085,11 @@ export function renderPaymentsListPage(input: {
               <th>נוצר בתאריך</th>
               <th>לקוח</th>
               <th>טלפון</th>
+              <th>אימייל</th>
               <th>סכום</th>
               <th>סטטוס</th>
               <th>קבלה</th>
+              <th>Provider</th>
               <th>קישור</th>
               <th>פעולה</th>
             </tr>
@@ -1146,6 +1165,7 @@ export function renderPaymentDetailsPage(input: {
           <h3>${escapeHtml(input.payment.customerName)}</h3>
           <p><span class="status-badge">${getPaymentStatusLabel(input.payment.status)}</span></p>
           <div class="details-grid">
+            <div class="detail"><strong>Payment ID</strong>${escapeHtml(input.payment.id)}</div>
             <div class="detail"><strong>סכום</strong>${formatAmountAgorot(input.payment.amountAgorot)}</div>
             <div class="detail"><strong>תיאור</strong>${escapeHtml(input.payment.description)}</div>
             <div class="detail"><strong>טלפון</strong>${escapeHtml(input.payment.customerPhone ?? "—")}</div>
@@ -1343,6 +1363,34 @@ export function renderClientRequirementsPage(input: { appConfig: AppConfig }) {
           ${CLIENT_REQUIREMENTS_ITEMS.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
         </ul>
         <div class="note">בשלב זה parser אמיתי ל-webhook של GROW עדיין לא קיים. הוא יתווסף רק אחרי קבלת payloads מאומתים מ-sandbox ו/או production.</div>
+        <div class="note">מקום עתידי ללוגו, צבעי מותג ונכסי משרד רשמיים יתווסף רק לאחר קבלת assets מהלקוח.</div>
+      </section>
+    `
+  });
+}
+
+export function renderStatusPage(input: {
+  appConfig: AppConfig;
+  title: string;
+  headline: string;
+  message: string;
+  statusCode: number;
+}) {
+  return renderLayout({
+    appConfig: input.appConfig,
+    title: `${input.headline} — נמרודי ושות׳`,
+    activePath: "dashboard",
+    pageTitle: `שגיאה ${input.statusCode}`,
+    content: `
+      <section class="hero">
+        <h2>${escapeHtml(input.headline)}</h2>
+        <p>${escapeHtml(input.message)}</p>
+      </section>
+      <section class="card">
+        <div class="button-row">
+          <a class="button" href="/">חזרה ללוח הבקרה</a>
+          <a class="button secondary" href="/admin/payments">מעבר לעסקאות</a>
+        </div>
       </section>
     `
   });

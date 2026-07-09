@@ -14,7 +14,7 @@ export function registerReadyRoutes(
       return c.json(
         {
           status: "config_error",
-          phase: "7/8",
+          phase: "8/8",
           checks: {
             config: "failed",
             db: "unknown"
@@ -30,7 +30,7 @@ export function registerReadyRoutes(
       return c.json(
         {
           status: "not_ready",
-          phase: "7/8",
+          phase: "8/8",
           checks: {
             config: "ok",
             db: "missing_binding"
@@ -44,7 +44,7 @@ export function registerReadyRoutes(
 
     return c.json({
       status: "ready",
-      phase: "7/8",
+      phase: "8/8",
       checks: {
         config: "ok",
         db: "ok"
