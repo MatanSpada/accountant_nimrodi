@@ -89,7 +89,7 @@ describe("app routes", () => {
       }
     });
     expect(dashboard.status).toBe(200);
-    expect(await dashboard.text()).toContain("לוח בקרה");
+    expect(await dashboard.text()).toContain("דשבורד");
 
     const logout = await app.request("/logout", {
       method: "POST",
@@ -337,7 +337,7 @@ describe("app routes", () => {
     const html = await response.text();
     expect(html).toContain("סטטוס מערכת");
     expect(html).toContain("דמו");
-    expect(html).toContain("תצורת הדגמה");
+    expect(html).toContain("תצורת הסביבה");
   });
 
   it("returns a clear safe health error when sandbox config is incomplete", async () => {
@@ -507,7 +507,7 @@ describe("app routes", () => {
       headers: { cookie: session.cookie ?? "" }
     });
     expect(dashboard.status).toBe(200);
-    expect(await dashboard.text()).toContain("סביבת הדגמה פעילה");
+    expect(await dashboard.text()).toContain("סביבת הדגמה");
 
     const newPaymentPage = await app.request("/admin/payments/new", {
       headers: { cookie: session.cookie ?? "" }
@@ -518,7 +518,7 @@ describe("app routes", () => {
       headers: { cookie: session.cookie ?? "" }
     });
     expect(paymentsPage.status).toBe(200);
-    expect(await paymentsPage.text()).toContain("רשימת עסקאות");
+    expect(await paymentsPage.text()).toContain("עסקאות");
 
     const detailPage = await app.request(
       `/admin/payments/${createPayload.payment.id}`,
@@ -527,7 +527,7 @@ describe("app routes", () => {
       }
     );
     const detailHtml = await detailPage.text();
-    expect(detailHtml).toContain("פתיחת WhatsApp");
+    expect(detailHtml).toContain("WhatsApp");
     expect(detailHtml).toContain("התנתקות");
     expect(detailHtml).toContain("מסמך דמו");
 
@@ -616,6 +616,6 @@ describe("app routes", () => {
       }
     );
     expect(mockInvoicePage.status).toBe(200);
-    expect(await mockInvoicePage.text()).toContain("מסמך דמו לצפייה");
+    expect(await mockInvoicePage.text()).toContain("מסמך דמו");
   });
 });

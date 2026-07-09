@@ -28,68 +28,35 @@ export interface DashboardMetrics {
 }
 
 function getEnvironmentLabel(appEnv: AppConfig["appEnv"]) {
-  if (appEnv === "development") {
-    return "פיתוח";
-  }
-
-  if (appEnv === "staging") {
-    return "בדיקות";
-  }
-
+  if (appEnv === "development") return "פיתוח";
+  if (appEnv === "staging") return "בדיקות";
   return "ייצור";
 }
 
 function getGrowModeLabel(appConfig: AppConfig) {
-  if (appConfig.growMode === "mock") {
-    return "דמו";
-  }
-
-  if (appConfig.growMode === "sandbox") {
-    return "סביבת בדיקות";
-  }
-
+  if (appConfig.growMode === "mock") return "דמו";
+  if (appConfig.growMode === "sandbox") return "סביבת בדיקות";
   return "ייצור";
 }
 
 function getProviderLabel(provider: string) {
-  if (provider === "mock-grow" || provider === "mock_grow") {
-    return "דמו";
-  }
-
-  if (provider === "grow") {
-    return "GROW";
-  }
-
+  if (provider === "mock-grow" || provider === "mock_grow") return "דמו";
+  if (provider === "grow") return "GROW";
   return provider;
 }
 
 function getInvoiceDisplayState(invoice: InvoiceRecord | null) {
-  if (!invoice) {
-    return "טרם נוצר מסמך";
-  }
-
-  if (invoice.status === "created") {
-    return "מסמך זמין";
-  }
-
-  if (invoice.status === "failed") {
-    return "נדרשת בדיקה";
-  }
-
+  if (!invoice) return "טרם נוצר מסמך";
+  if (invoice.status === "created") return "מסמך זמין";
+  if (invoice.status === "failed") return "נדרשת בדיקה";
   return getInvoiceStatusLabel(invoice.status);
 }
 
 function getWebhookProcessingStatusLabel(
   status: PaymentWebhookRecord["processingStatus"]
 ) {
-  if (status === "processed") {
-    return "עובד";
-  }
-
-  if (status === "failed") {
-    return "נכשל";
-  }
-
+  if (status === "processed") return "עובד";
+  if (status === "failed") return "נכשל";
   return status;
 }
 
@@ -100,1134 +67,1171 @@ function getWebhookEventLabel(eventType: string) {
     "payment.cancelled": "תשלום בוטל",
     "payment.expired": "תשלום פג תוקף"
   };
-
   return labels[eventType] ?? eventType;
 }
+
+const CSS = `
+  :root {
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --surface-soft: #f7f8fa;
+    --surface-muted: #eef0f4;
+    --ink: #0d1b2a;
+    --ink-soft: #4a5568;
+    --ink-faint: #8896a8;
+    --line: #e2e8f0;
+    --line-strong: #cbd5e1;
+    --brand: #1e3a5f;
+    --brand-light: #2c5282;
+    --brand-soft: #e8eef6;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --success: #15803d;
+    --success-soft: #dcfce7;
+    --warning: #b45309;
+    --warning-soft: #fef3c7;
+    --danger: #b91c1c;
+    --danger-soft: #fee2e2;
+    --shadow-xs: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-sm: 0 4px 12px rgba(0,0,0,0.06);
+    --shadow-md: 0 8px 24px rgba(0,0,0,0.08);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: "Noto Sans Hebrew", "Segoe UI", system-ui, sans-serif;
+    --sidebar-w: 240px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font);
+    color: var(--ink);
+    background: var(--bg);
+    font-size: 0.925rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--brand); }
+  button, input, textarea, select { font: inherit; }
+
+  /* ── Layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    background: #111827;
+    color: #e5e7eb;
+    padding: 0;
+  }
+
+  .sidebar-top {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .brand-eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .brand-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #f9fafb;
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  .sidebar-nav {
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .nav-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6b7280;
+    padding: 8px 8px 4px;
+    margin-top: 8px;
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    color: #9ca3af;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background 150ms ease, color 150ms ease;
+    position: relative;
+    text-decoration: none;
+  }
+
+  .nav-link:hover {
+    background: rgba(255,255,255,0.06);
+    color: #e5e7eb;
+  }
+
+  .nav-link.active {
+    background: rgba(37,99,235,0.18);
+    color: #93c5fd;
+  }
+
+  .nav-link.active::before {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: 3px 0 0 3px;
+    background: #3b82f6;
+  }
+
+  .nav-icon {
+    width: 16px;
+    height: 16px;
+    opacity: 0.75;
+    flex-shrink: 0;
+  }
+
+  .sidebar-footer {
+    padding: 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .sidebar-env {
+    font-size: 0.75rem;
+    color: #6b7280;
+    padding: 6px 8px;
+    margin-bottom: 6px;
+    line-height: 1.5;
+  }
+
+  /* ── Main Content ── */
+  main {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Topbar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 32px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .env-badge {
+    font-size: 0.75rem;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--warning-soft);
+    color: var(--warning);
+    font-weight: 500;
+    border: 1px solid rgba(180,83,9,0.12);
+  }
+
+  /* ── Page Content Area ── */
+  .page-content {
+    padding: 28px 32px;
+    flex: 1;
+  }
+
+  /* ── Section label (Power BI style) ── */
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 12px;
+  }
+
+  /* ── KPI Row ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    box-shadow: var(--shadow-xs);
+    transition: box-shadow 200ms ease, transform 200ms ease;
+  }
+
+  .kpi-card:hover {
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+  }
+
+  .kpi-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .kpi-value.accent { color: var(--accent); }
+  .kpi-value.success { color: var(--success); }
+
+  .kpi-sub {
+    font-size: 0.8rem;
+    color: var(--ink-faint);
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .card-header h3 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  /* ── Dashboard grid ── */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .dashboard-sidebar-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ── Recent payments (simplified dashboard table) ── */
+  .recent-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .recent-table th {
+    text-align: right;
+    padding: 0 12px 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .recent-table td {
+    text-align: right;
+    padding: 11px 12px;
+    font-size: 0.875rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+
+  .recent-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .recent-table tbody tr {
+    transition: background 120ms ease;
+  }
+
+  .recent-table tbody tr:hover {
+    background: var(--surface-soft);
+  }
+
+  /* ── Breakdown ── */
+  .breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .breakdown-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .breakdown-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.82rem;
+  }
+
+  .breakdown-meta .b-label { color: var(--ink-soft); }
+  .breakdown-meta .b-count { font-weight: 600; color: var(--ink); font-size: 0.85rem; }
+
+  .breakdown-track {
+    height: 5px;
+    border-radius: 999px;
+    background: var(--line);
+    overflow: hidden;
+  }
+
+  .breakdown-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--brand-light), var(--accent));
+    transition: width 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* ── Quick actions ── */
+  .quick-links {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .quick-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+  }
+
+  .quick-link:hover {
+    background: var(--surface-muted);
+    border-color: var(--line-strong);
+    color: var(--ink);
+    transform: translateX(-2px);
+  }
+
+  .quick-link-arrow {
+    color: var(--ink-faint);
+    font-size: 0.9rem;
+  }
+
+  /* ── Full table (payments list) ── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .data-table th {
+    text-align: right;
+    padding: 0 14px 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom: 2px solid var(--line);
+    white-space: nowrap;
+  }
+
+  .data-table td {
+    text-align: right;
+    padding: 14px 14px;
+    font-size: 0.875rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+
+  .data-table tbody tr {
+    transition: background 120ms ease;
+    cursor: pointer;
+  }
+
+  .data-table tbody tr:hover { background: var(--surface-soft); }
+  .data-table tbody tr:last-child td { border-bottom: none; }
+
+  .cell-primary { font-weight: 600; color: var(--ink); }
+  .cell-secondary { color: var(--ink-faint); font-size: 0.8rem; margin-top: 2px; }
+  .amount-strong { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+  /* ── Status badges ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
+    line-height: 1.5;
+  }
+
+  .badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .badge-default { background: var(--brand-soft); color: var(--brand); }
+  .badge-default::before { background: var(--brand-light); }
+  .badge-success { background: var(--success-soft); color: var(--success); }
+  .badge-success::before { background: var(--success); }
+  .badge-warning { background: var(--warning-soft); color: var(--warning); }
+  .badge-warning::before { background: var(--warning); }
+  .badge-danger { background: var(--danger-soft); color: var(--danger); }
+  .badge-danger::before { background: var(--danger); }
+  .badge-neutral { background: var(--surface-muted); color: var(--ink-soft); }
+  .badge-neutral::before { background: var(--ink-faint); }
+
+  /* ── Inline code ── */
+  .inline-code {
+    direction: ltr;
+    display: block;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+    word-break: break-all;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 0 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+    text-decoration: none;
+    line-height: 1;
+  }
+
+  .btn:active { transform: scale(0.98); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(37,99,235,0.25);
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+
+  .btn-secondary:hover {
+    background: var(--surface-soft);
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1px solid transparent;
+  }
+
+  .btn-ghost:hover {
+    background: var(--surface-soft);
+    color: var(--ink);
+  }
+
+  .btn-whatsapp {
+    background: #16a34a;
+    color: #fff;
+  }
+
+  .btn-whatsapp:hover {
+    background: #15803d;
+    color: #fff;
+    transform: translateY(-1px);
+  }
+
+  .btn-danger {
+    background: var(--danger-soft);
+    color: var(--danger);
+    border: 1px solid rgba(185,28,28,0.15);
+  }
+
+  .btn-danger:hover { background: #fecaca; }
+
+  .btn-sm {
+    min-height: 30px;
+    padding: 0 12px;
+    font-size: 0.8rem;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  /* ── Forms ── */
+  .form-shell {
+    max-width: 640px;
+  }
+
+  .form-grid {
+    display: grid;
+    gap: 18px;
+  }
+
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  label {
+    display: grid;
+    gap: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="password"],
+  input:not([type]),
+  textarea {
+    width: 100%;
+    padding: 10px 13px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 0.9rem;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+  }
+
+  textarea { min-height: 110px; resize: vertical; }
+
+  input::placeholder, textarea::placeholder { color: var(--ink-faint); }
+
+  /* ── Detail layout ── */
+  .detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .detail-customer {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 4px;
+    line-height: 1.2;
+  }
+
+  .detail-desc {
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  .detail-status-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .detail-amount {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .split-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ── Summary grid (detail page) ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .summary-cell {
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+  }
+
+  .summary-cell strong {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 5px;
+  }
+
+  .summary-cell span {
+    font-size: 0.9rem;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+
+  /* ── Timeline ── */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .timeline-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.875rem;
+  }
+
+  .timeline-item:last-child { border-bottom: none; }
+
+  .timeline-item .t-label { color: var(--ink-soft); }
+  .timeline-item .t-value { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* ── Technical items (webhooks) ── */
+  .tech-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .tech-item {
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+  }
+
+  .tech-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .tech-field strong {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 3px;
+  }
+
+  .tech-field span {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    word-break: break-all;
+  }
+
+  /* ── Disclosure ── */
+  .disclosure {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .disclosure + .disclosure {
+    margin-top: 12px;
+  }
+
+  .disclosure summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 14px 18px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    user-select: none;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .disclosure summary:hover { background: var(--surface-soft); color: var(--ink); }
+  .disclosure summary::-webkit-details-marker { display: none; }
+
+  .disclosure summary::after {
+    content: "›";
+    font-size: 1rem;
+    color: var(--ink-faint);
+    transition: transform 180ms ease;
+    transform: rotate(90deg);
+  }
+
+  .disclosure[open] summary::after { transform: rotate(-90deg); }
+
+  .disclosure-body {
+    padding: 0 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  /* ── Alert boxes ── */
+  .alert {
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    line-height: 1.65;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .alert-info { background: var(--surface-soft); border: 1px solid var(--line); color: var(--ink-soft); }
+  .alert-success { background: var(--success-soft); border: 1px solid rgba(21,128,61,0.2); color: var(--success); }
+  .alert-warning { background: var(--warning-soft); border: 1px solid rgba(180,83,9,0.2); color: var(--warning); }
+  .alert-danger { background: var(--danger-soft); border: 1px solid rgba(185,28,28,0.2); color: var(--danger); }
+
+  /* ── Empty state ── */
+  .empty {
+    padding: 32px 20px;
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 0.875rem;
+    line-height: 1.7;
+  }
+
+  /* ── Pagination ── */
+  .pagination {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    justify-content: flex-start;
+  }
+
+  /* ── Copy toast ── */
+  .copy-anchor {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .copy-toast {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 130px;
+    padding: 7px 11px;
+    border-radius: var(--radius-sm);
+    background: var(--ink);
+    color: #fff;
+    font-size: 0.8rem;
+    opacity: 0;
+    transform: translateY(-3px);
+    pointer-events: none;
+    transition: opacity 150ms ease, transform 150ms ease;
+    white-space: nowrap;
+    z-index: 20;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .copy-toast.visible { opacity: 1; transform: translateY(0); }
+
+  /* ── Login page ── */
+  .login-shell {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: var(--bg);
+  }
+
+  .login-card {
+    width: min(440px, 100%);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 36px 32px;
+    box-shadow: var(--shadow-md);
+  }
+
+  .login-eyebrow {
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .login-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 8px;
+  }
+
+  .login-subtitle {
+    color: var(--ink-soft);
+    font-size: 0.875rem;
+    line-height: 1.65;
+    margin: 0 0 24px;
+  }
+
+  .login-form label {
+    margin-bottom: 18px;
+  }
+
+  /* ── Status page ── */
+  .status-page { max-width: 600px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 1280px) {
+    .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .dashboard-sidebar-stack { flex-direction: row; }
+  }
+
+  @media (max-width: 1024px) {
+    .split-grid { grid-template-columns: 1fr; }
+    .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { height: auto; position: static; flex-direction: row; flex-wrap: wrap; padding: 0; }
+    .sidebar-top { flex: 1; padding: 16px 20px; border-bottom: none; border-left: 1px solid rgba(255,255,255,0.06); }
+    .sidebar-nav { flex-direction: row; padding: 8px 12px; flex: none; width: 100%; gap: 4px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .sidebar-footer { display: none; }
+    .page-content, .topbar { padding-left: 20px; padding-right: 20px; }
+    .dashboard-sidebar-stack { flex-direction: column; }
+  }
+
+  @media (max-width: 640px) {
+    .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .form-grid-2 { grid-template-columns: 1fr; }
+    .summary-grid { grid-template-columns: 1fr; }
+    .tech-grid { grid-template-columns: 1fr; }
+    .page-content { padding: 16px; }
+    .topbar { padding: 14px 16px; }
+  }
+`;
+
+const SHARED_JS = `
+  document.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const button = target.closest("[data-copy-text]");
+    if (!(button instanceof HTMLElement)) return;
+    const text = button.getAttribute("data-copy-text");
+    if (!text) return;
+    const feedbackId = button.getAttribute("data-copy-feedback");
+    const feedback = feedbackId ? document.getElementById(feedbackId) : null;
+    if (!(feedback instanceof HTMLElement)) return;
+    if (feedback.dataset.timeoutId) window.clearTimeout(Number(feedback.dataset.timeoutId));
+    const showToast = (message) => {
+      feedback.textContent = message;
+      feedback.classList.add("visible");
+      const tid = window.setTimeout(() => feedback.classList.remove("visible"), 2000);
+      feedback.dataset.timeoutId = String(tid);
+    };
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        showToast("הקישור הועתק");
+      } else {
+        showToast("העתקה לא נתמכת");
+      }
+    } catch {
+      showToast("לא ניתן להעתיק");
+    }
+  });
+
+  document.addEventListener("submit", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLFormElement)) return;
+    if (!target.hasAttribute("data-mock-webhook-form") && !target.hasAttribute("data-mock-invoice-form")) return;
+    event.preventDefault();
+    try {
+      let query;
+      if (target.hasAttribute("data-mock-webhook-form")) {
+        const formData = new FormData(target);
+        const payload = Object.fromEntries(formData.entries());
+        payload.amount_agorot = Number(payload.amount_agorot);
+        payload.occurred_at = new Date().toISOString();
+        const response = await fetch("/api/mock-grow/webhook", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+        const data = await response.json();
+        query = new URLSearchParams({ simulator_outcome: String(data.outcome || "failed"), simulator_message: String(data.message || "פעולת ההדגמה הסתיימה.") });
+      } else {
+        const endpoint = target.getAttribute("data-endpoint");
+        if (!endpoint) throw new Error("חסר יעד ליצירת מסמך.");
+        const response = await fetch(endpoint, { method: "POST" });
+        const data = await response.json();
+        query = new URLSearchParams({ invoice_outcome: String(data.outcome || "failed"), invoice_message: String(data.message || "פעולת יצירת המסמך הסתיימה.") });
+      }
+      const redirectBase = target.getAttribute("data-redirect") || window.location.pathname;
+      window.location.href = redirectBase + "?" + query.toString();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : target.hasAttribute("data-mock-webhook-form") ? "לא ניתן היה להשלים את פעולת ההדגמה." : "לא ניתן היה ליצור מסמך.";
+      const redirectBase = target.getAttribute("data-redirect") || window.location.pathname;
+      const key = target.hasAttribute("data-mock-webhook-form") ? "simulator" : "invoice";
+      const query = new URLSearchParams({ [key + "_outcome"]: "failed", [key + "_message"]: message });
+      window.location.href = redirectBase + "?" + query.toString();
+    }
+  });
+`;
 
 function renderLayout(input: {
   appConfig: AppConfig;
   title: string;
   activePath: "dashboard" | "new-payment" | "payments";
   content: string;
-  pageTitle?: string;
 }) {
   const navItems = [
     {
       key: "dashboard",
       href: "/",
-      label: "לוח בקרה"
+      label: "דשבורד",
+      icon: `<svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>`
     },
     {
       key: "new-payment",
       href: "/admin/payments/new",
-      label: "יצירת בקשה"
+      label: "בקשת תשלום",
+      icon: `<svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="5" x2="8" y2="11"/><line x1="5" y1="8" x2="11" y2="8"/></svg>`
     },
     {
       key: "payments",
       href: "/admin/payments",
-      label: "עסקאות"
+      label: "עסקאות",
+      icon: `<svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="3.5" width="13" height="9" rx="1.5"/><line x1="1.5" y1="6.5" x2="14.5" y2="6.5"/></svg>`
     }
   ] as const;
 
+  const envInfo: string[] = [];
+  if (input.appConfig.appEnv !== "production") {
+    envInfo.push(`סביבה: ${getEnvironmentLabel(input.appConfig.appEnv)}`);
+  }
+  if (input.appConfig.growMode === "mock") {
+    envInfo.push("מצב תשלום: דמו");
+  }
+
   return `<!DOCTYPE html>
-  <html lang="he" dir="rtl">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>${escapeHtml(input.title)}</title>
-      <style>
-        :root {
-          --bg: #f4f2ee;
-          --surface: #fffdf8;
-          --surface-soft: #f8f5ef;
-          --surface-muted: #f1ece3;
-          --ink: #162331;
-          --ink-soft: #5b6876;
-          --ink-faint: #7a8694;
-          --line: #ddd6cb;
-          --line-strong: #cfc5b8;
-          --brand: #23384f;
-          --brand-soft: #dfe7ef;
-          --brand-deep: #162738;
-          --success: #2d6a4f;
-          --success-soft: #e5f0e9;
-          --warning: #9a6a2e;
-          --warning-soft: #f6eddc;
-          --danger: #8f3d3d;
-          --danger-soft: #f6e5e5;
-          --shadow-sm: 0 8px 18px rgba(17, 27, 38, 0.05);
-          --shadow-md: 0 18px 40px rgba(17, 27, 38, 0.08);
-          --radius-lg: 24px;
-          --radius-md: 18px;
-          --radius-sm: 14px;
-          --font: "Noto Sans Hebrew", "Segoe UI", sans-serif;
-        }
-
-        * { box-sizing: border-box; }
-
-        html { scroll-behavior: smooth; }
-
-        body {
-          margin: 0;
-          min-height: 100vh;
-          font-family: var(--font);
-          color: var(--ink);
-          background:
-            radial-gradient(circle at top right, rgba(35, 56, 79, 0.06), transparent 28%),
-            linear-gradient(180deg, #f8f5ef 0%, var(--bg) 100%);
-        }
-
-        a {
-          color: var(--brand);
-          text-decoration: none;
-        }
-
-        a:hover {
-          color: var(--brand-deep);
-        }
-
-        button,
-        input,
-        textarea {
-          font: inherit;
-        }
-
-        .layout {
-          min-height: 100vh;
-          display: grid;
-          grid-template-columns: 300px minmax(0, 1fr);
-        }
-
-        .sidebar {
-          position: sticky;
-          top: 0;
-          align-self: start;
-          min-height: 100vh;
-          padding: 28px 24px;
-          background: linear-gradient(180deg, #1f3349 0%, #152432 100%);
-          color: #f5f2ec;
-          border-left: 1px solid rgba(255, 255, 255, 0.07);
-        }
-
-        .brand {
-          margin-bottom: 26px;
-        }
-
-        .brand small {
-          display: block;
-          margin-bottom: 10px;
-          color: rgba(245, 242, 236, 0.72);
-          letter-spacing: 0.06em;
-          font-size: 0.82rem;
-        }
-
-        .brand h1 {
-          margin: 0 0 10px;
-          font-size: 1.55rem;
-          line-height: 1.25;
-        }
-
-        .brand p {
-          margin: 0;
-          color: rgba(245, 242, 236, 0.76);
-          line-height: 1.7;
-          font-size: 0.96rem;
-        }
-
-        nav {
-          display: grid;
-          gap: 10px;
-        }
-
-        nav a {
-          display: block;
-          padding: 14px 16px;
-          border-radius: 14px;
-          color: inherit;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
-        }
-
-        nav a:hover {
-          transform: translateY(-1px);
-          color: #fff;
-          background: rgba(255, 255, 255, 0.08);
-        }
-
-        nav a.active {
-          background: rgba(223, 231, 239, 0.12);
-          border-color: rgba(223, 231, 239, 0.24);
-        }
-
-        .sidebar-footnote {
-          margin-top: 22px;
-          padding: 16px 18px;
-          border-radius: 16px;
-          background: rgba(255, 255, 255, 0.05);
-          color: rgba(245, 242, 236, 0.74);
-          line-height: 1.7;
-          font-size: 0.93rem;
-        }
-
-        main {
-          padding: 32px;
-        }
-
-        .topbar {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 16px;
-          margin-bottom: 20px;
-          flex-wrap: wrap;
-        }
-
-        .page-title {
-          margin: 0;
-          font-size: 1.95rem;
-          line-height: 1.15;
-        }
-
-        .page-kicker {
-          margin-bottom: 8px;
-          color: var(--ink-faint);
-          font-size: 0.92rem;
-        }
-
-        .topbar-actions {
-          display: flex;
-          gap: 10px;
-          align-items: center;
-          flex-wrap: wrap;
-        }
-
-        .meta-chip {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 38px;
-          padding: 0 12px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.82);
-          border: 1px solid var(--line);
-          color: var(--ink-soft);
-          font-size: 0.88rem;
-          box-shadow: var(--shadow-sm);
-        }
-
-        .context-row {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          margin-bottom: 22px;
-        }
-
-        .hero {
-          display: grid;
-          grid-template-columns: minmax(0, 1.3fr) minmax(240px, 0.7fr);
-          gap: 18px;
-          padding: 28px;
-          border-radius: 28px;
-          background:
-            linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(247, 243, 235, 0.94));
-          border: 1px solid var(--line);
-          box-shadow: var(--shadow-md);
-          margin-bottom: 24px;
-        }
-
-        .hero h2 {
-          margin: 0 0 12px;
-          font-size: 2rem;
-          line-height: 1.15;
-        }
-
-        .hero p {
-          margin: 0;
-          color: var(--ink-soft);
-          line-height: 1.8;
-          max-width: 60ch;
-        }
-
-        .hero-panel {
-          padding: 18px 20px;
-          border-radius: 20px;
-          background: rgba(35, 56, 79, 0.04);
-          border: 1px solid rgba(35, 56, 79, 0.08);
-          display: grid;
-          gap: 10px;
-          align-content: start;
-        }
-
-        .hero-panel strong {
-          font-size: 0.95rem;
-        }
-
-        .section-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr);
-          gap: 24px;
-        }
-
-        .split-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-          gap: 24px;
-        }
-
-        .card {
-          background: var(--surface);
-          border: 1px solid var(--line);
-          border-radius: var(--radius-lg);
-          box-shadow: var(--shadow-sm);
-          padding: 24px;
-        }
-
-        .card-stack {
-          display: grid;
-          gap: 24px;
-        }
-
-        .section-head {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 16px;
-          margin-bottom: 18px;
-          flex-wrap: wrap;
-        }
-
-        .section-head h3 {
-          margin: 0;
-          font-size: 1.2rem;
-        }
-
-        .section-head p {
-          margin: 6px 0 0;
-          color: var(--ink-soft);
-          line-height: 1.7;
-          font-size: 0.95rem;
-        }
-
-        .metric-grid {
-          display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
-          gap: 14px;
-        }
-
-        .metric-card {
-          padding: 18px;
-          border-radius: 20px;
-          background: linear-gradient(180deg, #fff 0%, #fbf8f2 100%);
-          border: 1px solid var(--line);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-        }
-
-        .metric-card span {
-          display: block;
-          color: var(--ink-faint);
-          font-size: 0.88rem;
-          margin-bottom: 10px;
-        }
-
-        .metric-card strong {
-          display: block;
-          font-size: 1.6rem;
-          line-height: 1.1;
-          margin-bottom: 6px;
-          color: var(--brand-deep);
-        }
-
-        .metric-card small {
-          color: var(--ink-soft);
-          font-size: 0.86rem;
-        }
-
-        .breakdown-list {
-          display: grid;
-          gap: 12px;
-        }
-
-        .breakdown-item {
-          display: grid;
-          gap: 8px;
-          padding: 14px 16px;
-          border-radius: 16px;
-          background: var(--surface-soft);
-          border: 1px solid var(--line);
-        }
-
-        .breakdown-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          color: var(--ink);
-        }
-
-        .breakdown-bar {
-          height: 8px;
-          border-radius: 999px;
-          overflow: hidden;
-          background: rgba(35, 56, 79, 0.08);
-        }
-
-        .breakdown-bar span {
-          display: block;
-          height: 100%;
-          border-radius: inherit;
-          background: linear-gradient(90deg, #6a8095 0%, #23384f 100%);
-        }
-
-        .quick-actions {
-          display: grid;
-          gap: 12px;
-        }
-
-        .quick-action {
-          display: block;
-          padding: 18px;
-          border-radius: 18px;
-          background: var(--surface-soft);
-          border: 1px solid var(--line);
-          transition: transform 180ms ease, border-color 180ms ease;
-        }
-
-        .quick-action:hover {
-          transform: translateY(-1px);
-          border-color: var(--line-strong);
-        }
-
-        .quick-action strong {
-          display: block;
-          margin-bottom: 6px;
-          color: var(--ink);
-        }
-
-        .quick-action span {
-          color: var(--ink-soft);
-          font-size: 0.94rem;
-          line-height: 1.65;
-        }
-
-        .form-grid {
-          display: grid;
-          gap: 18px;
-        }
-
-        .form-grid.two-columns {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        label {
-          display: grid;
-          gap: 8px;
-          color: var(--ink-soft);
-          font-size: 0.95rem;
-        }
-
-        input,
-        textarea {
-          width: 100%;
-          border-radius: 14px;
-          border: 1px solid var(--line);
-          background: #fff;
-          color: var(--ink);
-          padding: 13px 14px;
-          transition: border-color 180ms ease, box-shadow 180ms ease;
-        }
-
-        input:focus,
-        textarea:focus {
-          outline: none;
-          border-color: rgba(35, 56, 79, 0.4);
-          box-shadow: 0 0 0 3px rgba(35, 56, 79, 0.08);
-        }
-
-        textarea {
-          min-height: 120px;
-          resize: vertical;
-        }
-
-        .button-row {
-          display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-          align-items: center;
-          margin-top: 18px;
-        }
-
-        .button,
-        button {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          min-height: 46px;
-          padding: 0 18px;
-          border: 0;
-          border-radius: 14px;
-          background: var(--brand);
-          color: #fff;
-          cursor: pointer;
-          box-shadow: 0 10px 20px rgba(35, 56, 79, 0.16);
-          transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
-        }
-
-        .button:hover,
-        button:hover {
-          transform: translateY(-1px);
-          background: var(--brand-deep);
-          color: #fff;
-        }
-
-        .button.secondary {
-          background: #fff;
-          color: var(--ink);
-          border: 1px solid var(--line);
-          box-shadow: none;
-        }
-
-        .button.secondary:hover {
-          background: var(--surface-soft);
-          color: var(--ink);
-        }
-
-        .button.whatsapp {
-          background: var(--success);
-        }
-
-        .button.whatsapp:hover {
-          background: #245640;
-        }
-
-        .status-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          min-height: 32px;
-          padding: 0 10px;
-          border-radius: 999px;
-          background: var(--brand-soft);
-          color: var(--brand);
-          font-size: 0.88rem;
-          white-space: nowrap;
-        }
-
-        .status-badge.success {
-          background: var(--success-soft);
-          color: var(--success);
-        }
-
-        .status-badge.warning {
-          background: var(--warning-soft);
-          color: var(--warning);
-        }
-
-        .status-badge.danger {
-          background: var(--danger-soft);
-          color: var(--danger);
-        }
-
-        table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-
-        th,
-        td {
-          text-align: right;
-          padding: 15px 12px;
-          border-bottom: 1px solid rgba(221, 214, 203, 0.85);
-          vertical-align: top;
-          font-size: 0.95rem;
-        }
-
-        th {
-          color: var(--ink-faint);
-          font-weight: 600;
-          font-size: 0.86rem;
-        }
-
-        tbody tr:hover {
-          background: rgba(255, 255, 255, 0.38);
-        }
-
-        .amount-strong {
-          font-weight: 700;
-          color: var(--brand-deep);
-        }
-
-        .inline-code {
-          direction: ltr;
-          display: inline-block;
-          background: var(--surface-soft);
-          border: 1px solid var(--line);
-          border-radius: 12px;
-          padding: 8px 10px;
-          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          font-size: 0.9rem;
-          word-break: break-all;
-        }
-
-        .empty-state {
-          padding: 24px;
-          border-radius: 18px;
-          background: var(--surface-soft);
-          border: 1px dashed var(--line-strong);
-          color: var(--ink-soft);
-          line-height: 1.8;
-          text-align: center;
-        }
-
-        .note,
-        .success-box,
-        .warning-box,
-        .error-box {
-          padding: 14px 16px;
-          border-radius: 16px;
-          line-height: 1.7;
-          font-size: 0.94rem;
-          margin-top: 14px;
-        }
-
-        .note {
-          background: var(--surface-soft);
-          border: 1px solid var(--line);
-          color: var(--ink-soft);
-        }
-
-        .success-box {
-          background: var(--success-soft);
-          border: 1px solid rgba(45, 106, 79, 0.16);
-          color: var(--success);
-        }
-
-        .warning-box {
-          background: var(--warning-soft);
-          border: 1px solid rgba(154, 106, 46, 0.16);
-          color: var(--warning);
-        }
-
-        .error-box {
-          background: var(--danger-soft);
-          border: 1px solid rgba(143, 61, 61, 0.16);
-          color: var(--danger);
-        }
-
-        .summary-grid {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 14px;
-        }
-
-        .summary-card {
-          padding: 18px;
-          border-radius: 18px;
-          background: var(--surface-soft);
-          border: 1px solid var(--line);
-        }
-
-        .summary-card strong {
-          display: block;
-          margin-bottom: 6px;
-          color: var(--ink-faint);
-          font-size: 0.86rem;
-          font-weight: 600;
-        }
-
-        .summary-card span {
-          display: block;
-          color: var(--ink);
-          font-size: 1.08rem;
-          line-height: 1.5;
-        }
-
-        .timeline {
-          display: grid;
-          gap: 10px;
-        }
-
-        .timeline-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 14px 16px;
-          border-radius: 16px;
-          background: var(--surface-soft);
-          border: 1px solid var(--line);
-        }
-
-        .timeline-item strong {
-          color: var(--ink-faint);
-          font-size: 0.88rem;
-        }
-
-        .disclosure {
-          margin-top: 16px;
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          background: var(--surface-soft);
-          overflow: hidden;
-        }
-
-        .disclosure summary {
-          list-style: none;
-          cursor: pointer;
-          padding: 16px 18px;
-          font-weight: 600;
-          color: var(--ink);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-        }
-
-        .disclosure summary::-webkit-details-marker {
-          display: none;
-        }
-
-        .disclosure summary::before {
-          content: "▾";
-          color: var(--ink-faint);
-          transition: transform 180ms ease;
-        }
-
-        .disclosure[open] summary::before {
-          transform: rotate(180deg);
-        }
-
-        .disclosure-content {
-          padding: 0 18px 18px;
-          display: grid;
-          gap: 14px;
-        }
-
-        .technical-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
-        }
-
-        .technical-item {
-          padding: 14px 15px;
-          border-radius: 14px;
-          background: #fff;
-          border: 1px solid var(--line);
-        }
-
-        .technical-item strong {
-          display: block;
-          margin-bottom: 6px;
-          color: var(--ink-faint);
-          font-size: 0.84rem;
-        }
-
-        .copy-toast-anchor {
-          position: relative;
-          display: inline-flex;
-          align-items: center;
-        }
-
-        .copy-toast {
-          position: absolute;
-          top: calc(100% + 8px);
-          right: 0;
-          min-width: 165px;
-          padding: 10px 12px;
-          border-radius: 12px;
-          background: rgba(22, 35, 49, 0.95);
-          color: #fff;
-          font-size: 0.9rem;
-          opacity: 0;
-          transform: translateY(-4px);
-          pointer-events: none;
-          transition: opacity 180ms ease, transform 180ms ease;
-          white-space: nowrap;
-          z-index: 10;
-          box-shadow: 0 12px 26px rgba(17, 27, 38, 0.2);
-        }
-
-        .copy-toast.is-visible {
-          opacity: 1;
-          transform: translateY(0);
-        }
-
-        .pagination {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          margin-top: 20px;
-        }
-
-        .pagination a {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 40px;
-          padding: 0 14px;
-          border-radius: 12px;
-          background: #fff;
-          border: 1px solid var(--line);
-        }
-
-        .status-page {
-          max-width: 760px;
-        }
-
-        @media (max-width: 1200px) {
-          .metric-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-          }
-
-          .split-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .hero {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        @media (max-width: 960px) {
-          .layout,
-          .form-grid.two-columns,
-          .summary-grid,
-          .technical-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .metric-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-
-          .sidebar {
-            position: static;
-            min-height: auto;
-          }
-
-          .sidebar,
-          main {
-            padding: 20px;
-          }
-        }
-
-        @media (max-width: 640px) {
-          main {
-            padding: 16px;
-          }
-
-          .metric-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .hero,
-          .card {
-            padding: 20px;
-          }
-
-          .page-title {
-            font-size: 1.7rem;
-          }
-
-          th,
-          td {
-            padding: 12px 8px;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="layout">
-        <aside class="sidebar">
-          <div class="brand">
-            <small>נמרודי ושות׳ — רואי חשבון</small>
-            <h1>מערכת תשלומים</h1>
-            <p>ניהול בקשות תשלום, מעקב אחר סטטוסים ושליחת קישור ללקוח בצורה מסודרת ונעימה.</p>
-          </div>
-          <nav>
-            ${navItems
-              .map(
-                (item) => `
-                  <a href="${item.href}" class="${input.activePath === item.key ? "active" : ""}">
-                    ${item.label}
-                  </a>
-                `
-              )
-              .join("")}
-          </nav>
-          <div class="sidebar-footnote">
-            ממשק ניהול שקט, מדויק וברור לעבודה שוטפת מול לקוחות, תשלומים ומסמכים.
-          </div>
-        </aside>
-        <main>
-          <div class="topbar">
-            <div>
-              ${
-                input.pageTitle
-                  ? `<div class="page-kicker">${escapeHtml(input.pageTitle)}</div>`
-                  : ""
-              }
-              <h2 class="page-title">${escapeHtml(input.title)}</h2>
-            </div>
-            <div class="topbar-actions">
-              ${
-                input.appConfig.appEnv !== "production"
-                  ? `<span class="meta-chip">סביבה: ${escapeHtml(getEnvironmentLabel(input.appConfig.appEnv))}</span>`
-                  : ""
-              }
-              <span class="meta-chip">מצב תשלום: ${escapeHtml(getGrowModeLabel(input.appConfig))}</span>
-              <form method="post" action="/logout">
-                <button type="submit" class="button secondary">התנתקות</button>
-              </form>
-            </div>
-          </div>
-          ${renderContextRow(input.appConfig)}
-          ${input.content}
-        </main>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(input.title)} — נמרודי ושות׳</title>
+  <style>${CSS}</style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <span class="brand-eyebrow">נמרודי ושות׳</span>
+        <h1 class="brand-name">מערכת תשלומים</h1>
       </div>
-      <script>
-        document.addEventListener("click", async (event) => {
-          const target = event.target;
-          if (!(target instanceof HTMLElement)) return;
-
-          const button = target.closest("[data-copy-text]");
-          if (!(button instanceof HTMLElement)) return;
-
-          const text = button.getAttribute("data-copy-text");
-          if (!text) return;
-
-          const feedbackId = button.getAttribute("data-copy-feedback");
-          const feedback = feedbackId ? document.getElementById(feedbackId) : null;
-          if (!(feedback instanceof HTMLElement)) return;
-
-          if (feedback.dataset.timeoutId) {
-            window.clearTimeout(Number(feedback.dataset.timeoutId));
-          }
-
-          const showToast = (message) => {
-            feedback.textContent = message;
-            feedback.classList.add("is-visible");
-            const timeoutId = window.setTimeout(() => {
-              feedback.classList.remove("is-visible");
-            }, 2000);
-            feedback.dataset.timeoutId = String(timeoutId);
-          };
-
-          try {
-            if (navigator.clipboard?.writeText) {
-              await navigator.clipboard.writeText(text);
-              showToast("הקישור הועתק");
-            } else {
-              showToast("העתקה אוטומטית לא נתמכת בדפדפן זה");
-            }
-          } catch {
-            showToast("לא ניתן היה להעתיק את הקישור");
-          }
-        });
-
-        document.addEventListener("submit", async (event) => {
-          const target = event.target;
-          if (!(target instanceof HTMLFormElement)) return;
-
-          if (
-            !target.hasAttribute("data-mock-webhook-form") &&
-            !target.hasAttribute("data-mock-invoice-form")
-          ) {
-            return;
-          }
-
-          event.preventDefault();
-
-          try {
-            let query;
-
-            if (target.hasAttribute("data-mock-webhook-form")) {
-              const formData = new FormData(target);
-              const payload = Object.fromEntries(formData.entries());
-              payload.amount_agorot = Number(payload.amount_agorot);
-              payload.occurred_at = new Date().toISOString();
-
-              const response = await fetch("/api/mock-grow/webhook", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify(payload)
-              });
-              const data = await response.json();
-
-              query = new URLSearchParams({
-                simulator_outcome: String(data.outcome || "failed"),
-                simulator_message: String(
-                  data.message || "פעולת ההדגמה הסתיימה."
-                )
-              });
-            } else {
-              const endpoint = target.getAttribute("data-endpoint");
-              if (!endpoint) {
-                throw new Error("חסר יעד ליצירת מסמך.");
-              }
-
-              const response = await fetch(endpoint, {
-                method: "POST"
-              });
-              const data = await response.json();
-
-              query = new URLSearchParams({
-                invoice_outcome: String(data.outcome || "failed"),
-                invoice_message: String(
-                  data.message || "פעולת יצירת המסמך הסתיימה."
-                )
-              });
-            }
-
-            const redirectBase =
-              target.getAttribute("data-redirect") || window.location.pathname;
-
-            window.location.href = redirectBase + "?" + query.toString();
-          } catch (error) {
-            const message =
-              error instanceof Error
-                ? error.message
-                : target.hasAttribute("data-mock-webhook-form")
-                  ? "לא ניתן היה להשלים את פעולת ההדגמה."
-                  : "לא ניתן היה ליצור מסמך.";
-            const redirectBase =
-              target.getAttribute("data-redirect") || window.location.pathname;
-            const query = new URLSearchParams({
-              [target.hasAttribute("data-mock-webhook-form")
-                ? "simulator_outcome"
-                : "invoice_outcome"]: "failed",
-              [target.hasAttribute("data-mock-webhook-form")
-                ? "simulator_message"
-                : "invoice_message"]: message
-            });
-            window.location.href = redirectBase + "?" + query.toString();
-          }
-        });
-      </script>
-    </body>
-  </html>`;
-}
-
-function renderContextRow(appConfig: AppConfig) {
-  const items: string[] = [];
-
-  if (appConfig.growMode === "mock") {
-    items.push("סביבת הדגמה פעילה");
-  }
-
-  if (appConfig.invoiceMode === "mock") {
-    items.push("מסמכי דמו זמינים לצפייה");
-  }
-
-  if (appConfig.enableDevTools) {
-    items.push("כלי הדגמה זמינים במסכים הרלוונטיים");
-  }
-
-  if (items.length === 0) {
-    return "";
-  }
-
-  return `
-    <div class="context-row">
-      ${items.map((item) => `<span class="meta-chip">${escapeHtml(item)}</span>`).join("")}
-    </div>
-  `;
+      <nav class="sidebar-nav">
+        ${navItems
+          .map(
+            (item) => `
+          <a href="${item.href}" class="nav-link${input.activePath === item.key ? " active" : ""}">
+            ${item.icon}
+            ${item.label}
+          </a>`
+          )
+          .join("")}
+      </nav>
+      <div class="sidebar-footer">
+        ${envInfo.length > 0 ? `<div class="sidebar-env">${escapeHtml(envInfo.join(" · "))}</div>` : ""}
+        <form method="post" action="/logout">
+          <button type="submit" class="btn btn-ghost" style="width:100%;justify-content:flex-start;font-size:0.8rem;color:#6b7280;min-height:34px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 12H2.5A1.5 1.5 0 0 1 1 10.5v-5A1.5 1.5 0 0 1 2.5 4H6"/><polyline points="10 12 14 8 10 4"/><line x1="14" y1="8" x2="5" y2="8"/></svg>
+            התנתקות
+          </button>
+        </form>
+      </div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <h2 class="page-title">${escapeHtml(input.title)}</h2>
+        <div class="topbar-right">
+          ${input.appConfig.appEnv !== "production" && input.appConfig.growMode === "mock" ? `<span class="env-badge">סביבת הדגמה</span>` : ""}
+          <a href="/admin/settings/client-requirements" class="btn btn-ghost btn-sm" style="color:var(--ink-faint);">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="5.5" x2="8" y2="8.5"/><circle cx="8" cy="11" r="0.5" fill="currentColor"/></svg>
+            מערכת
+          </a>
+        </div>
+      </header>
+      <div class="page-content">
+        ${input.content}
+      </div>
+    </main>
+  </div>
+  <script>${SHARED_JS}</script>
+</body>
+</html>`;
 }
 
 function getStatusBadgeClass(status: Payment["status"]) {
-  if (status === "paid") {
-    return "status-badge success";
-  }
-
-  if (status === "failed" || status === "cancelled" || status === "expired") {
-    return "status-badge danger";
-  }
-
-  return "status-badge warning";
-}
-
-function renderPaymentRows(items: PaymentListItemView[]) {
-  if (items.length === 0) {
-    return `
-      <tr>
-        <td colspan="8">
-          <div class="empty-state">עדיין לא נוצרו בקשות תשלום. אפשר להתחיל ביצירת בקשה חדשה ללקוח.</div>
-        </td>
-      </tr>
-    `;
-  }
-
-  return items
-    .map(
-      ({ payment, invoice }) => `
-        <tr>
-          <td>${formatDateTime(payment.createdAt)}</td>
-          <td>
-            <strong>${escapeHtml(payment.customerName)}</strong><br />
-            <span style="color: var(--ink-faint);">${escapeHtml(payment.description)}</span>
-          </td>
-          <td>${escapeHtml(payment.customerPhone ?? "—")}<br /><span style="color: var(--ink-faint);">${escapeHtml(payment.customerEmail ?? "—")}</span></td>
-          <td class="amount-strong">${formatAmountAgorot(payment.amountAgorot)}</td>
-          <td><span class="${getStatusBadgeClass(payment.status)}">${getPaymentStatusLabel(payment.status)}</span></td>
-          <td>${
-            invoice?.invoiceUrl
-              ? `<a href="${escapeHtml(invoice.invoiceUrl)}" target="_blank" rel="noreferrer">קבלה נוצרה</a>`
-              : payment.invoiceId
-                ? "קבלה נוצרה — בפרטים"
-                : "טרם נוצרה"
-          }</td>
-          <td>${
-            payment.paymentUrl
-              ? `<a href="${escapeHtml(payment.paymentUrl)}" target="_blank" rel="noreferrer">פתיחת קישור</a>`
-              : "—"
-          }</td>
-          <td><a href="/admin/payments/${payment.id}">לצפייה</a></td>
-        </tr>
-      `
-    )
-    .join("");
-}
-
-function renderEmptyBreakdown() {
-  return `
-    <div class="empty-state">
-      לאחר יצירת עסקאות יופיע כאן פירוט לפי סטטוסים.
-    </div>
-  `;
+  if (status === "paid") return "badge badge-success";
+  if (status === "failed" || status === "cancelled" || status === "expired")
+    return "badge badge-danger";
+  if (status === "pending" || status === "payment_created")
+    return "badge badge-warning";
+  return "badge badge-neutral";
 }
 
 function renderBreakdown(metrics: DashboardMetrics) {
-  const maxCount = Math.max(
-    1,
-    ...metrics.statusBreakdown.map((item) => item.count)
-  );
   const visibleItems = metrics.statusBreakdown.filter((item) => item.count > 0);
-
   if (visibleItems.length === 0) {
-    return renderEmptyBreakdown();
+    return `<div class="empty">לאחר יצירת עסקאות יופיע כאן פירוט לפי סטטוסים.</div>`;
   }
-
+  const maxCount = Math.max(1, ...visibleItems.map((item) => item.count));
   return `
     <div class="breakdown-list">
       ${visibleItems
         .map(
           (item) => `
-            <div class="breakdown-item">
-              <div class="breakdown-head">
-                <strong>${item.label}</strong>
-                <span>${item.count}</span>
-              </div>
-              <div class="breakdown-bar">
-                <span style="width: ${(item.count / maxCount) * 100}%"></span>
-              </div>
-            </div>
-          `
+        <div class="breakdown-row">
+          <div class="breakdown-meta">
+            <span class="b-label">${item.label}</span>
+            <span class="b-count">${item.count}</span>
+          </div>
+          <div class="breakdown-track">
+            <div class="breakdown-fill" style="width:${Math.round((item.count / maxCount) * 100)}%"></div>
+          </div>
+        </div>`
         )
         .join("")}
-    </div>
-  `;
+    </div>`;
 }
 
 function renderTimeline(payment: Payment) {
@@ -1237,136 +1241,97 @@ function renderTimeline(payment: Payment) {
     ["שולמה", payment.paidAt],
     ["בוטלה", payment.cancelledAt],
     ["נכשלה", payment.failedAt]
-  ].filter(([, value]) => Boolean(value)) as Array<[string, string]>;
+  ].filter(([, v]) => Boolean(v)) as Array<[string, string]>;
 
-  if (items.length === 0) {
-    return `<div class="empty-state">עדיין אין תאריכים מהותיים להצגה.</div>`;
-  }
+  if (items.length === 0)
+    return `<div class="empty">עדיין אין תאריכים להצגה.</div>`;
 
   return `
     <div class="timeline">
       ${items
         .map(
           ([label, value]) => `
-            <div class="timeline-item">
-              <strong>${label}</strong>
-              <span>${formatDateTime(value)}</span>
-            </div>
-          `
+        <div class="timeline-item">
+          <span class="t-label">${label}</span>
+          <span class="t-value">${formatDateTime(value)}</span>
+        </div>`
         )
         .join("")}
-    </div>
-  `;
+    </div>`;
 }
 
 function renderWebhookRecords(webhooks: PaymentWebhookRecord[]) {
   if (webhooks.length === 0) {
-    return `
-      <div class="empty-state">
-        עדיין לא נשמרו אירועי וובהוק לעסקה זו.
-      </div>
-    `;
+    return `<div class="empty">עדיין לא נשמרו אירועי webhook לעסקה זו.</div>`;
   }
 
   return `
-    <div class="card-stack" style="gap: 12px;">
+    <div class="tech-list">
       ${webhooks
         .map(
-          (webhook) => `
-            <div class="technical-item">
-              <div class="button-row" style="margin: 0 0 10px;">
-                <span class="status-badge">${escapeHtml(getWebhookEventLabel(webhook.eventType))}</span>
-                <span class="${
-                  webhook.processingStatus === "processed"
-                    ? "status-badge success"
-                    : webhook.processingStatus === "failed"
-                      ? "status-badge danger"
-                      : "status-badge"
-                }">${escapeHtml(
-                  getWebhookProcessingStatusLabel(webhook.processingStatus)
-                )}</span>
-              </div>
-              <div class="technical-grid">
-                <div class="technical-item">
-                  <strong>התקבל בתאריך</strong>
-                  ${formatDateTime(webhook.receivedAt)}
-                </div>
-                <div class="technical-item">
-                  <strong>עודכן בתאריך</strong>
-                  ${formatDateTime(webhook.processedAt)}
-                </div>
-                <div class="technical-item">
-                  <strong>מזהה אירוע אצל הספק</strong>
-                  ${escapeHtml(webhook.providerEventId ?? "—")}
-                </div>
-                <div class="technical-item">
-                  <strong>מזהה עסקה אצל הספק</strong>
-                  ${escapeHtml(webhook.providerTransactionId ?? "—")}
-                </div>
-              </div>
-              ${
-                webhook.processingError
-                  ? `<div class="error-box">${escapeHtml(webhook.processingError)}</div>`
-                  : ""
-              }
-            </div>
-          `
+          (wh) => `
+        <div class="tech-item">
+          <div class="btn-row" style="margin-bottom:10px;">
+            <span class="badge badge-default">${escapeHtml(getWebhookEventLabel(wh.eventType))}</span>
+            <span class="${
+              wh.processingStatus === "processed"
+                ? "badge badge-success"
+                : wh.processingStatus === "failed"
+                  ? "badge badge-danger"
+                  : "badge badge-neutral"
+            }">${escapeHtml(getWebhookProcessingStatusLabel(wh.processingStatus))}</span>
+          </div>
+          <div class="tech-grid">
+            <div class="tech-field"><strong>התקבל</strong><span>${formatDateTime(wh.receivedAt)}</span></div>
+            <div class="tech-field"><strong>עודכן</strong><span>${formatDateTime(wh.processedAt)}</span></div>
+            <div class="tech-field"><strong>מזהה אירוע</strong><span>${escapeHtml(wh.providerEventId ?? "—")}</span></div>
+            <div class="tech-field"><strong>מזהה עסקה</strong><span>${escapeHtml(wh.providerTransactionId ?? "—")}</span></div>
+          </div>
+          ${wh.processingError ? `<div class="alert alert-danger" style="margin-top:10px;">${escapeHtml(wh.processingError)}</div>` : ""}
+        </div>`
         )
         .join("")}
-    </div>
-  `;
-}
-
-function renderSimulatorForms(payment: Payment, redirectPath: string) {
-  if (isFinalPaymentStatus(payment.status)) {
-    return `
-      <div class="note">
-        העסקה כבר הסתיימה. אפשר עדיין להפעיל אירוע דמו חוזר לצורך בדיקת התנהגות בטוחה.
-      </div>
-      ${renderSimulatorButtons(payment, redirectPath)}
-    `;
-  }
-
-  return renderSimulatorButtons(payment, redirectPath);
+    </div>`;
 }
 
 function renderSimulatorButtons(payment: Payment, redirectPath: string) {
   const statuses = [
     { eventType: "payment.paid", status: "paid", label: "סימון כשולם" },
-    { eventType: "payment.failed", status: "failed", label: "סימון כנכשל" },
-    {
-      eventType: "payment.cancelled",
-      status: "cancelled",
-      label: "סימון כמבוטל"
-    },
-    {
-      eventType: "payment.expired",
-      status: "expired",
-      label: "סימון כפג תוקף"
-    }
+    { eventType: "payment.failed", status: "failed", label: "נכשל" },
+    { eventType: "payment.cancelled", status: "cancelled", label: "בוטל" },
+    { eventType: "payment.expired", status: "expired", label: "פג תוקף" }
   ] as const;
 
   return `
-    <div class="button-row">
+    <div class="btn-row">
       ${statuses
         .map(
           ({ eventType, status, label }) => `
-            <form method="post" data-mock-webhook-form data-redirect="${escapeHtml(redirectPath)}">
-              <input type="hidden" name="event_id" value="mock_evt_${escapeHtml(payment.id)}_${status}" />
-              <input type="hidden" name="event_type" value="${eventType}" />
-              <input type="hidden" name="provider" value="mock_grow" />
-              <input type="hidden" name="provider_payment_id" value="${escapeHtml(payment.providerPaymentId ?? "")}" />
-              <input type="hidden" name="provider_transaction_id" value="${escapeHtml(payment.providerTransactionId ?? "")}" />
-              <input type="hidden" name="status" value="${status}" />
-              <input type="hidden" name="amount_agorot" value="${payment.amountAgorot}" />
-              <input type="hidden" name="currency" value="${escapeHtml(payment.currency)}" />
-              <button type="submit" class="button secondary">${label}</button>
-            </form>
-          `
+        <form method="post" data-mock-webhook-form data-redirect="${escapeHtml(redirectPath)}">
+          <input type="hidden" name="event_id" value="mock_evt_${escapeHtml(payment.id)}_${status}" />
+          <input type="hidden" name="event_type" value="${eventType}" />
+          <input type="hidden" name="provider" value="mock_grow" />
+          <input type="hidden" name="provider_payment_id" value="${escapeHtml(payment.providerPaymentId ?? "")}" />
+          <input type="hidden" name="provider_transaction_id" value="${escapeHtml(payment.providerTransactionId ?? "")}" />
+          <input type="hidden" name="status" value="${status}" />
+          <input type="hidden" name="amount_agorot" value="${payment.amountAgorot}" />
+          <input type="hidden" name="currency" value="${escapeHtml(payment.currency)}" />
+          <button type="submit" class="btn btn-secondary btn-sm">${label}</button>
+        </form>`
         )
         .join("")}
-    </div>
-  `;
+    </div>`;
+}
+
+function renderSimulatorForms(payment: Payment, redirectPath: string) {
+  if (isFinalPaymentStatus(payment.status)) {
+    return `
+      <div class="alert alert-info" style="margin-bottom:12px;">
+        העסקה הסתיימה. ניתן עדיין להפעיל אירוע דמו חוזר לצורך בדיקה.
+      </div>
+      ${renderSimulatorButtons(payment, redirectPath)}`;
+  }
+  return renderSimulatorButtons(payment, redirectPath);
 }
 
 function renderInvoiceSection(input: {
@@ -1375,36 +1340,26 @@ function renderInvoiceSection(input: {
 }) {
   if (!input.invoice) {
     return `
-      <div class="summary-grid">
-        <div class="summary-card">
+      <div class="summary-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+        <div class="summary-cell">
           <strong>מצב מסמך</strong>
-          <span>${
-            input.payment.status === "paid"
-              ? "המערכת תנסה להפיק מסמך לאחר אישור התשלום."
-              : "המסמך יופיע לאחר אישור התשלום."
-          }</span>
+          <span>${input.payment.status === "paid" ? "המערכת תנסה להפיק מסמך בקרוב." : "המסמך יופיע לאחר אישור התשלום."}</span>
         </div>
-        <div class="summary-card">
+        <div class="summary-cell">
           <strong>קישור למסמך</strong>
-          <span>עדיין לא זמין</span>
-        </div>
-        <div class="summary-card">
-          <strong>הערה</strong>
-          <span>במסך הדגמה זהו מסמך תצוגה בלבד.</span>
+          <span style="color:var(--ink-faint)">עדיין לא זמין</span>
         </div>
       </div>
       ${
         input.payment.status === "paid"
           ? `
-            <div class="button-row">
-              <form method="post" data-mock-invoice-form data-endpoint="/api/payments/${escapeHtml(input.payment.id)}/invoice/mock" data-redirect="/admin/payments/${escapeHtml(input.payment.id)}">
-                <button type="submit" class="button secondary">יצירת מסמך דמו</button>
-              </form>
-            </div>
-          `
+        <div class="btn-row" style="margin-top:14px;">
+          <form method="post" data-mock-invoice-form data-endpoint="/api/payments/${escapeHtml(input.payment.id)}/invoice/mock" data-redirect="/admin/payments/${escapeHtml(input.payment.id)}">
+            <button type="submit" class="btn btn-secondary btn-sm">יצירת מסמך דמו</button>
+          </form>
+        </div>`
           : ""
-      }
-    `;
+      }`;
   }
 
   const canRetry =
@@ -1412,42 +1367,103 @@ function renderInvoiceSection(input: {
     (input.invoice.status === "failed" || input.invoice.status === "pending");
 
   return `
-    <div class="summary-grid">
-      <div class="summary-card">
+    <div class="summary-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+      <div class="summary-cell">
         <strong>מצב מסמך</strong>
         <span>${getInvoiceDisplayState(input.invoice)}</span>
       </div>
-      <div class="summary-card">
+      <div class="summary-cell">
         <strong>מספר מסמך</strong>
         <span>${escapeHtml(input.invoice.invoiceNumber ?? "—")}</span>
-      </div>
-      <div class="summary-card">
-        <strong>תיאור</strong>
-        <span>מסמך דמו לצפייה ולהדגמה בלבד</span>
       </div>
     </div>
     ${
       input.invoice.invoiceUrl
         ? `
-          <div class="button-row">
-            <a class="button secondary" href="${escapeHtml(input.invoice.invoiceUrl)}" target="_blank" rel="noreferrer">פתיחת מסמך דמו</a>
-          </div>
-        `
+      <div class="btn-row" style="margin-top:14px;">
+        <a class="btn btn-secondary btn-sm" href="${escapeHtml(input.invoice.invoiceUrl)}" target="_blank" rel="noreferrer">פתיחת מסמך דמו</a>
+      </div>`
         : ""
     }
-    <div class="note">המסמך המוצג כאן מיועד להדגמה בלבד ואינו מסמך חשבונאי או משפטי.</div>
+    <div class="alert alert-info" style="margin-top:12px;">המסמך המוצג מיועד להדגמה בלבד.</div>
     ${
       canRetry
         ? `
-          <div class="button-row">
-            <form method="post" data-mock-invoice-form data-endpoint="/api/payments/${escapeHtml(input.payment.id)}/invoice/mock" data-redirect="/admin/payments/${escapeHtml(input.payment.id)}">
-              <button type="submit" class="button secondary">ניסיון נוסף ליצירת מסמך</button>
-            </form>
-          </div>
-        `
+      <div class="btn-row" style="margin-top:10px;">
+        <form method="post" data-mock-invoice-form data-endpoint="/api/payments/${escapeHtml(input.payment.id)}/invoice/mock" data-redirect="/admin/payments/${escapeHtml(input.payment.id)}">
+          <button type="submit" class="btn btn-secondary btn-sm">ניסיון נוסף ליצירת מסמך</button>
+        </form>
+      </div>`
         : ""
-    }
-  `;
+    }`;
+}
+
+function renderDashboardRows(items: PaymentListItemView[]) {
+  if (items.length === 0) {
+    return `<tr><td colspan="5"><div class="empty">עדיין אין עסקאות במערכת.</div></td></tr>`;
+  }
+
+  return items
+    .slice(0, 8)
+    .map(
+      ({ payment, invoice }) => `
+    <tr onclick="window.location='/admin/payments/${payment.id}'">
+      <td>
+        <div class="cell-primary">${escapeHtml(payment.customerName)}</div>
+        <div class="cell-secondary">${escapeHtml(payment.description)}</div>
+      </td>
+      <td class="amount-strong">${formatAmountAgorot(payment.amountAgorot)}</td>
+      <td><span class="${getStatusBadgeClass(payment.status)}">${getPaymentStatusLabel(payment.status)}</span></td>
+      <td>${
+        invoice?.invoiceUrl
+          ? `<a href="${escapeHtml(invoice.invoiceUrl)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">מסמך</a>`
+          : payment.invoiceId
+            ? `<span style="color:var(--ink-faint);font-size:0.8rem">נוצר</span>`
+            : `<span style="color:var(--ink-faint);font-size:0.8rem">—</span>`
+      }</td>
+      <td style="color:var(--ink-faint);font-size:0.8rem;">${formatDateTime(payment.createdAt)}</td>
+    </tr>`
+    )
+    .join("");
+}
+
+function renderPaymentRows(items: PaymentListItemView[]) {
+  if (items.length === 0) {
+    return `<tr><td colspan="7"><div class="empty">עדיין לא נוצרו בקשות תשלום.</div></td></tr>`;
+  }
+
+  return items
+    .map(
+      ({ payment, invoice }) => `
+    <tr onclick="window.location='/admin/payments/${payment.id}'">
+      <td style="color:var(--ink-faint);font-size:0.8rem;white-space:nowrap;">${formatDateTime(payment.createdAt)}</td>
+      <td>
+        <div class="cell-primary">${escapeHtml(payment.customerName)}</div>
+        <div class="cell-secondary">${escapeHtml(payment.description)}</div>
+      </td>
+      <td style="font-size:0.8rem;color:var(--ink-soft);">
+        ${escapeHtml(payment.customerPhone ?? "—")}<br/>
+        <span style="color:var(--ink-faint);">${escapeHtml(payment.customerEmail ?? "—")}</span>
+      </td>
+      <td class="amount-strong">${formatAmountAgorot(payment.amountAgorot)}</td>
+      <td><span class="${getStatusBadgeClass(payment.status)}">${getPaymentStatusLabel(payment.status)}</span></td>
+      <td>${
+        invoice?.invoiceUrl
+          ? `<a href="${escapeHtml(invoice.invoiceUrl)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">מסמך</a>`
+          : payment.invoiceId
+            ? `<span style="color:var(--ink-faint);font-size:0.8rem">נוצר</span>`
+            : `<span style="color:var(--ink-faint);font-size:0.8rem">—</span>`
+      }</td>
+      <td>
+        ${
+          payment.paymentUrl
+            ? `<a href="${escapeHtml(payment.paymentUrl)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()" style="font-size:0.8rem;">קישור</a>`
+            : `<span style="color:var(--ink-faint);font-size:0.8rem">—</span>`
+        }
+      </td>
+    </tr>`
+    )
+    .join("");
 }
 
 export function renderLoginPage(input: {
@@ -1458,132 +1474,98 @@ export function renderLoginPage(input: {
   const nextPath = input.nextPath?.startsWith("/") ? input.nextPath : "/";
 
   return `<!DOCTYPE html>
-  <html lang="he" dir="rtl">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>כניסה — נמרודי ושות׳</title>
-      <style>
-        :root {
-          --bg: #f4f2ee;
-          --surface: #fffdf8;
-          --line: #ddd6cb;
-          --ink: #162331;
-          --ink-soft: #5b6876;
-          --brand: #23384f;
-          --danger: #8f3d3d;
-          --shadow: 0 18px 40px rgba(17, 27, 38, 0.08);
-          --font: "Noto Sans Hebrew", "Segoe UI", sans-serif;
-        }
-
-        body {
-          margin: 0;
-          min-height: 100vh;
-          display: grid;
-          place-items: center;
-          padding: 24px;
-          font-family: var(--font);
-          color: var(--ink);
-          background:
-            radial-gradient(circle at top right, rgba(35, 56, 79, 0.06), transparent 28%),
-            linear-gradient(180deg, #f8f5ef 0%, var(--bg) 100%);
-        }
-
-        .card {
-          width: min(460px, 100%);
-          padding: 30px;
-          border-radius: 26px;
-          border: 1px solid var(--line);
-          background: rgba(255, 253, 248, 0.96);
-          box-shadow: var(--shadow);
-        }
-
-        .eyebrow {
-          margin-bottom: 8px;
-          color: var(--ink-soft);
-          font-size: 0.9rem;
-        }
-
-        h1 {
-          margin: 0 0 10px;
-          font-size: 2rem;
-        }
-
-        p {
-          margin: 0;
-          color: var(--ink-soft);
-          line-height: 1.8;
-        }
-
-        label {
-          display: grid;
-          gap: 8px;
-          margin-top: 22px;
-          color: var(--ink-soft);
-        }
-
-        input {
-          width: 100%;
-          box-sizing: border-box;
-          padding: 13px 14px;
-          border-radius: 14px;
-          border: 1px solid var(--line);
-          font: inherit;
-        }
-
-        button {
-          margin-top: 18px;
-          width: 100%;
-          min-height: 48px;
-          border: 0;
-          border-radius: 14px;
-          background: var(--brand);
-          color: #fff;
-          cursor: pointer;
-          font: inherit;
-        }
-
-        .error,
-        .note {
-          margin-top: 16px;
-          padding: 13px 14px;
-          border-radius: 14px;
-          line-height: 1.7;
-        }
-
-        .error {
-          background: #f6e5e5;
-          color: var(--danger);
-        }
-
-        .note {
-          background: #eef2f6;
-          color: var(--brand);
-        }
-      </style>
-    </head>
-    <body>
-      <section class="card">
-        <div class="eyebrow">נמרודי ושות׳ — רואי חשבון</div>
-        <h1>כניסה למערכת</h1>
-        <p>אזור זה מיועד לשימוש ניהולי בלבד לצורך יצירת בקשות תשלום, מעקב אחר עסקאות וצפייה במסמכים.</p>
-        ${input.errorMessage ? `<div class="error">${escapeHtml(input.errorMessage)}</div>` : ""}
-        ${
-          input.appConfig.appEnv !== "production"
-            ? `<div class="note">המערכת זמינה כעת בסביבת ${escapeHtml(getEnvironmentLabel(input.appConfig.appEnv))}.</div>`
-            : ""
-        }
-        <form method="post" action="/login">
-          <input type="hidden" name="next" value="${escapeHtml(nextPath)}" />
-          <label>
-            סיסמת ניהול
-            <input type="password" name="password" autocomplete="current-password" required />
-          </label>
-          <button type="submit">כניסה</button>
-        </form>
-      </section>
-    </body>
-  </html>`;
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>כניסה — נמרודי ושות׳</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      font-family: "Noto Sans Hebrew", "Segoe UI", system-ui, sans-serif;
+      background: #f0f2f5;
+      color: #0d1b2a;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      width: min(440px, 100%);
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 36px 32px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+    .eyebrow {
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #8896a8;
+      margin: 0 0 10px;
+      display: block;
+    }
+    h1 { font-size: 1.5rem; font-weight: 700; color: #0d1b2a; margin: 0 0 8px; }
+    p { color: #4a5568; font-size: 0.875rem; line-height: 1.65; margin: 0 0 24px; }
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #4a5568;
+      margin-bottom: 18px;
+    }
+    input {
+      width: 100%;
+      padding: 10px 13px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      font: inherit;
+      font-size: 0.9rem;
+      color: #0d1b2a;
+      background: #fff;
+      transition: border-color 150ms, box-shadow 150ms;
+    }
+    input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+    button {
+      width: 100%;
+      min-height: 42px;
+      border: none;
+      border-radius: 8px;
+      background: #1e3a5f;
+      color: #fff;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 150ms, transform 150ms;
+    }
+    button:hover { background: #162d4a; transform: translateY(-1px); }
+    .error { margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: #fee2e2; color: #b91c1c; font-size: 0.875rem; border: 1px solid rgba(185,28,28,0.15); }
+    .note { margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: #e8eef6; color: #1e3a5f; font-size: 0.875rem; border: 1px solid rgba(30,58,95,0.12); }
+  </style>
+</head>
+<body>
+  <section class="card">
+    <span class="eyebrow">נמרודי ושות׳ — רואי חשבון</span>
+    <h1>כניסה למערכת</h1>
+    <p>אזור זה מיועד לשימוש ניהולי בלבד.</p>
+    ${input.errorMessage ? `<div class="error">${escapeHtml(input.errorMessage)}</div>` : ""}
+    ${input.appConfig.appEnv !== "production" ? `<div class="note">המערכת זמינה כעת בסביבת ${escapeHtml(getEnvironmentLabel(input.appConfig.appEnv))}.</div>` : ""}
+    <form method="post" action="/login">
+      <input type="hidden" name="next" value="${escapeHtml(nextPath)}" />
+      <label>
+        סיסמת ניהול
+        <input type="password" name="password" autocomplete="current-password" required />
+      </label>
+      <button type="submit">כניסה</button>
+    </form>
+  </section>
+</body>
+</html>`;
 }
 
 export function renderDashboardPage(input: {
@@ -1593,118 +1575,83 @@ export function renderDashboardPage(input: {
 }) {
   return renderLayout({
     appConfig: input.appConfig,
-    title: "לוח בקרה",
+    title: "דשבורד",
     activePath: "dashboard",
-    pageTitle: "סקירה כללית",
     content: `
-      <section class="hero">
-        <div>
-          <h2>תמונת מצב שוטפת של בקשות התשלום</h2>
-          <p>מבט מרוכז על הפעילות האחרונה: כמה בקשות נשלחו, כמה כבר שולמו, ומה עדיין דורש טיפול או מעקב.</p>
-        </div>
-        <div class="hero-panel">
-          <strong>מה אפשר לעשות מכאן</strong>
-          <span>ליצור בקשת תשלום חדשה, לעקוב אחר עסקאות פתוחות, ולהמשיך ישירות לפרטי כל עסקה.</span>
-        </div>
-      </section>
+      <p class="section-label">סקירה כללית</p>
 
-      <section class="card">
-        <div class="section-head">
-          <div>
-            <h3>מדדים מרכזיים</h3>
-            <p>תצוגה מרוכזת של תמונת הפעילות במערכת.</p>
-          </div>
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-label">סך בקשות</span>
+          <span class="kpi-value">${input.metrics.totalRequests}</span>
+          <span class="kpi-sub">כלל העסקאות שנוצרו</span>
         </div>
-        <div class="metric-grid">
-          <div class="metric-card">
-            <span>סך בקשות תשלום</span>
-            <strong>${input.metrics.totalRequests}</strong>
-            <small>כלל העסקאות שנוצרו</small>
-          </div>
-          <div class="metric-card">
-            <span>תשלומים ששולמו</span>
-            <strong>${input.metrics.paidCount}</strong>
-            <small>עסקאות שסומנו כשולמו</small>
-          </div>
-          <div class="metric-card">
-            <span>תשלומים ממתינים</span>
-            <strong>${input.metrics.pendingCount}</strong>
-            <small>טיוטות, קישורים פתוחים ותשלומים ממתינים</small>
-          </div>
-          <div class="metric-card">
-            <span>סכום ששולם</span>
-            <strong>${formatAmountAgorot(input.metrics.paidAmountAgorot)}</strong>
-            <small>סך הסכום שאושר</small>
-          </div>
-          <div class="metric-card">
-            <span>סכום ממתין</span>
-            <strong>${formatAmountAgorot(input.metrics.pendingAmountAgorot)}</strong>
-            <small>סכום שעדיין ממתין לתשלום</small>
-          </div>
+        <div class="kpi-card">
+          <span class="kpi-label">שולמו</span>
+          <span class="kpi-value success">${input.metrics.paidCount}</span>
+          <span class="kpi-sub">עסקאות שאושרו</span>
         </div>
-      </section>
+        <div class="kpi-card">
+          <span class="kpi-label">ממתינות</span>
+          <span class="kpi-value">${input.metrics.pendingCount}</span>
+          <span class="kpi-sub">פתוחות לתשלום</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">סכום שנגבה</span>
+          <span class="kpi-value accent" style="font-size:1.5rem;">${formatAmountAgorot(input.metrics.paidAmountAgorot)}</span>
+          <span class="kpi-sub">ממתין: ${formatAmountAgorot(input.metrics.pendingAmountAgorot)}</span>
+        </div>
+      </div>
 
-      <section class="split-grid">
-        <section class="card">
-          <div class="section-head">
-            <div>
-              <h3>עסקאות אחרונות</h3>
-              <p>העסקאות האחרונות שנוצרו במערכת, עם גישה מהירה לפרטים ולמסמכים.</p>
-            </div>
-            <a class="button secondary" href="/admin/payments">לכל העסקאות</a>
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-header">
+            <h3>עסקאות אחרונות</h3>
+            <a class="btn btn-secondary btn-sm" href="/admin/payments">לכל העסקאות</a>
           </div>
-          <table>
+          <table class="recent-table">
             <thead>
               <tr>
-                <th>נוצרה</th>
                 <th>לקוח</th>
-                <th>פרטי קשר</th>
                 <th>סכום</th>
                 <th>סטטוס</th>
                 <th>מסמך</th>
-                <th>קישור</th>
-                <th></th>
+                <th>תאריך</th>
               </tr>
             </thead>
-            <tbody>${renderPaymentRows(input.payments)}</tbody>
+            <tbody>${renderDashboardRows(input.payments)}</tbody>
           </table>
-        </section>
+        </div>
 
-        <div class="card-stack">
-          <section class="card">
-            <div class="section-head">
-              <div>
-                <h3>התפלגות סטטוסים</h3>
-                <p>חלוקה מהירה של הבקשות לפי מצב התשלום.</p>
-              </div>
+        <div class="dashboard-sidebar-stack">
+          <div class="card">
+            <div class="card-header">
+              <h3>התפלגות סטטוסים</h3>
             </div>
             ${renderBreakdown(input.metrics)}
-          </section>
+          </div>
 
-          <section class="card">
-            <div class="section-head">
-              <div>
-                <h3>פעולות מהירות</h3>
-                <p>קישורים קצרים למשימות המרכזיות במערכת.</p>
-              </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>פעולות מהירות</h3>
             </div>
-            <div class="quick-actions">
-              <a class="quick-action" href="/admin/payments/new">
-                <strong>יצירת בקשת תשלום</strong>
-                <span>פתיחת בקשה חדשה עם קישור תשלום מוכן לשליחה.</span>
+            <div class="quick-links">
+              <a class="quick-link" href="/admin/payments/new">
+                <span>יצירת בקשת תשלום</span>
+                <span class="quick-link-arrow">‹</span>
               </a>
-              <a class="quick-action" href="/admin/payments">
-                <strong>רשימת עסקאות</strong>
-                <span>מעקב אחר סטטוסים, מסמכים וקישורי תשלום.</span>
+              <a class="quick-link" href="/admin/payments">
+                <span>רשימת עסקאות</span>
+                <span class="quick-link-arrow">‹</span>
               </a>
-              <a class="quick-action" href="/admin/settings/client-requirements">
-                <strong>סטטוס מערכת</strong>
-                <span>סיכום סביבת העבודה ופעולות ניהול זמינות.</span>
+              <a class="quick-link" href="/admin/payments/export.csv">
+                <span>ייצוא CSV</span>
+                <span class="quick-link-arrow">‹</span>
               </a>
             </div>
-          </section>
+          </div>
         </div>
-      </section>
+      </div>
     `
   });
 }
@@ -1718,64 +1665,48 @@ export function renderNewPaymentPage(input: {
 
   return renderLayout({
     appConfig: input.appConfig,
-    title: "יצירת בקשת תשלום",
+    title: "בקשת תשלום חדשה",
     activePath: "new-payment",
-    pageTitle: "בקשה חדשה",
     content: `
-      <section class="hero">
-        <div>
-          <h2>יצירת בקשת תשלום חדשה</h2>
-          <p>ממלאים את פרטי הלקוח, הסכום ותיאור הבקשה. לאחר השמירה יוצג קישור תשלום מוכן להעתקה ולשליחה.</p>
+      <div class="form-shell">
+        <p class="section-label">פרטי הבקשה</p>
+        <div class="card">
+          ${input.errorMessage ? `<div class="alert alert-danger" style="margin-bottom:18px;">${escapeHtml(input.errorMessage)}</div>` : ""}
+          <form id="payment-form" class="form-grid" method="post" action="/api/payments">
+            <div class="form-grid-2">
+              <label>
+                שם הלקוח
+                <input name="customer_name" required value="${escapeHtml(values.customer_name ?? "")}" placeholder="שם מלא" />
+              </label>
+              <label>
+                טלפון
+                <input name="customer_phone" value="${escapeHtml(values.customer_phone ?? "")}" placeholder="0501234567" />
+              </label>
+            </div>
+            <div class="form-grid-2">
+              <label>
+                אימייל
+                <input name="customer_email" type="email" value="${escapeHtml(values.customer_email ?? "")}" placeholder="client@example.com" />
+              </label>
+              <label>
+                סכום בשקלים
+                <input name="amount_shekel" type="number" step="0.01" min="0.01" required value="${escapeHtml(values.amount_shekel ?? "")}" placeholder="1,250.00" />
+              </label>
+            </div>
+            <label>
+              תיאור הבקשה
+              <textarea name="description" required placeholder="שכר טרחה עבור דוח שנתי">${escapeHtml(values.description ?? "")}</textarea>
+            </label>
+            <div class="btn-row" style="margin-top:4px;">
+              <button type="submit" class="btn btn-primary">יצירת בקשה</button>
+              <a class="btn btn-secondary" href="/admin/payments">ביטול</a>
+            </div>
+          </form>
         </div>
-        <div class="hero-panel">
-          <strong>טיפ קצר</strong>
-          <span>הסכום מוזן בשקלים מטעמי נוחות, והמערכת ממירה אותו לאגורות ברקע.</span>
+        <div class="alert alert-info" style="margin-top:14px;">
+          הסכום מוזן בשקלים — המערכת ממירה לאגורות ברקע.
         </div>
-      </section>
-
-      <section class="card">
-        <div class="section-head">
-          <div>
-            <h3>פרטי הבקשה</h3>
-            <p>המידע כאן משמש ליצירת הקישור ולתצוגה ברשימת העסקאות.</p>
-          </div>
-        </div>
-        ${
-          input.errorMessage
-            ? `<div class="error-box">${escapeHtml(input.errorMessage)}</div>`
-            : ""
-        }
-        <form id="payment-form" class="form-grid" method="post" action="/api/payments">
-          <div class="form-grid two-columns">
-            <label>
-              שם הלקוח
-              <input name="customer_name" required value="${escapeHtml(values.customer_name ?? "")}" />
-            </label>
-            <label>
-              טלפון
-              <input name="customer_phone" value="${escapeHtml(values.customer_phone ?? "")}" placeholder="0501234567" />
-            </label>
-          </div>
-          <div class="form-grid two-columns">
-            <label>
-              אימייל
-              <input name="customer_email" type="email" value="${escapeHtml(values.customer_email ?? "")}" placeholder="client@example.com" />
-            </label>
-            <label>
-              סכום בשקלים
-              <input name="amount_shekel" type="number" step="0.01" min="0.01" required value="${escapeHtml(values.amount_shekel ?? "")}" placeholder="1250.00" />
-            </label>
-          </div>
-          <label>
-            תיאור הבקשה
-            <textarea name="description" required placeholder="שכר טרחה עבור דוח שנתי">${escapeHtml(values.description ?? "")}</textarea>
-          </label>
-          <div class="button-row">
-            <button type="submit">יצירת בקשה</button>
-            <a class="button secondary" href="/admin/payments">חזרה לרשימת העסקאות</a>
-          </div>
-        </form>
-      </section>
+      </div>
       <script>
         const form = document.getElementById("payment-form");
         if (form instanceof HTMLFormElement) {
@@ -1783,38 +1714,23 @@ export function renderNewPaymentPage(input: {
             event.preventDefault();
             const formData = new FormData(form);
             const payload = Object.fromEntries(formData.entries());
-
             try {
               const response = await fetch("/api/payments", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify(payload)
               });
-
               const data = await response.json();
-              if (!response.ok) {
-                throw new Error(data.error || "לא ניתן היה ליצור בקשת תשלום.");
-              }
-
+              if (!response.ok) throw new Error(data.error || "לא ניתן היה ליצור בקשת תשלום.");
               window.location.href = "/admin/payments/" + data.payment.id;
             } catch (error) {
-              const message =
-                error instanceof Error
-                  ? error.message
-                  : "לא ניתן היה ליצור בקשת תשלום.";
-              window.location.href =
-                "/admin/payments/new?error=" +
-                encodeURIComponent(message) +
-                "&customer_name=" +
-                encodeURIComponent(String(payload.customer_name || "")) +
-                "&customer_phone=" +
-                encodeURIComponent(String(payload.customer_phone || "")) +
-                "&customer_email=" +
-                encodeURIComponent(String(payload.customer_email || "")) +
-                "&amount_shekel=" +
-                encodeURIComponent(String(payload.amount_shekel || "")) +
-                "&description=" +
-                encodeURIComponent(String(payload.description || ""));
+              const message = error instanceof Error ? error.message : "לא ניתן היה ליצור בקשת תשלום.";
+              window.location.href = "/admin/payments/new?error=" + encodeURIComponent(message)
+                + "&customer_name=" + encodeURIComponent(String(payload.customer_name || ""))
+                + "&customer_phone=" + encodeURIComponent(String(payload.customer_phone || ""))
+                + "&customer_email=" + encodeURIComponent(String(payload.customer_email || ""))
+                + "&amount_shekel=" + encodeURIComponent(String(payload.amount_shekel || ""))
+                + "&description=" + encodeURIComponent(String(payload.description || ""));
             }
           });
         }
@@ -1838,41 +1754,25 @@ export function renderPaymentsListPage(input: {
     appConfig: input.appConfig,
     title: "עסקאות",
     activePath: "payments",
-    pageTitle: "רשימת עסקאות",
     content: `
-      <section class="hero">
-        <div>
-          <h2>רשימת עסקאות</h2>
-          <p>תצוגה מסודרת של כל בקשות התשלום, סטטוס התשלום, קישור התשלום והמסמך הנלווה כאשר הוא זמין.</p>
-        </div>
-        <div class="hero-panel">
-          <strong>פעולות זמינות</strong>
-          <span>אפשר לייצא נתונים, לפתוח עסקה קיימת או ליצור בקשה חדשה.</span>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="section-head">
-          <div>
-            <h3>כל הבקשות</h3>
-            <p>רשימה נקייה ופשוטה לצפייה ולעבודה שוטפת.</p>
-          </div>
-          <div class="button-row" style="margin-top: 0;">
-            <a class="button secondary" href="/admin/payments/export.csv">ייצוא CSV</a>
-            <a class="button" href="/admin/payments/new">יצירת בקשה חדשה</a>
+      <div class="card">
+        <div class="card-header">
+          <h3>כל הבקשות</h3>
+          <div class="btn-row">
+            <a class="btn btn-secondary btn-sm" href="/admin/payments/export.csv">ייצוא CSV</a>
+            <a class="btn btn-primary btn-sm" href="/admin/payments/new">בקשה חדשה</a>
           </div>
         </div>
-        <table>
+        <table class="data-table">
           <thead>
             <tr>
-              <th>נוצרה</th>
+              <th>תאריך</th>
               <th>לקוח</th>
               <th>פרטי קשר</th>
               <th>סכום</th>
               <th>סטטוס</th>
               <th>מסמך</th>
               <th>קישור</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>${renderPaymentRows(
@@ -1882,19 +1782,16 @@ export function renderPaymentsListPage(input: {
             }))
           )}</tbody>
         </table>
-        <div class="pagination">
-          ${
-            input.payments.offset > 0
-              ? `<a href="/admin/payments?limit=${input.payments.limit}&offset=${previousOffset}">עמוד קודם</a>`
-              : ""
-          }
-          ${
-            input.payments.hasMore
-              ? `<a href="/admin/payments?limit=${input.payments.limit}&offset=${nextOffset}">עמוד הבא</a>`
-              : ""
-          }
-        </div>
-      </section>
+        ${
+          input.payments.offset > 0 || input.payments.hasMore
+            ? `
+          <div class="pagination">
+            ${input.payments.offset > 0 ? `<a class="btn btn-secondary btn-sm" href="/admin/payments?limit=${input.payments.limit}&offset=${previousOffset}">עמוד קודם</a>` : ""}
+            ${input.payments.hasMore ? `<a class="btn btn-secondary btn-sm" href="/admin/payments?limit=${input.payments.limit}&offset=${nextOffset}">עמוד הבא</a>` : ""}
+          </div>`
+            : ""
+        }
+      </div>
     `
   });
 }
@@ -1917,191 +1814,114 @@ export function renderPaymentDetailsPage(input: {
     paymentUrl: input.payment.paymentUrl
   });
 
+  const simulatorAlert = input.simulatorMessage
+    ? `<div class="alert ${input.simulatorOutcome === "failed" ? "alert-danger" : input.simulatorOutcome === "duplicate" ? "alert-warning" : "alert-success"}" style="margin-bottom:16px;">${escapeHtml(input.simulatorMessage)}</div>`
+    : "";
+
+  const invoiceAlert = input.invoiceMessage
+    ? `<div class="alert ${input.invoiceOutcome === "failed" ? "alert-danger" : input.invoiceOutcome === "existing" ? "alert-warning" : "alert-success"}" style="margin-bottom:16px;">${escapeHtml(input.invoiceMessage)}</div>`
+    : "";
+
   return renderLayout({
     appConfig: input.appConfig,
     title: "פרטי עסקה",
     activePath: "payments",
-    pageTitle: "עסקה",
     content: `
-      <section class="hero">
-        <div>
-          <h2>${escapeHtml(input.payment.customerName)}</h2>
-          <p>פרטי הלקוח, מצב התשלום, הקישור שנשלח והמסמך הנלווה מרוכזים כאן לצפייה ולעבודה שוטפת.</p>
+      ${simulatorAlert}${invoiceAlert}
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="detail-header">
+          <div>
+            <h2 class="detail-customer">${escapeHtml(input.payment.customerName)}</h2>
+            <p class="detail-desc">${escapeHtml(input.payment.description)}</p>
+          </div>
+          <div class="detail-status-block">
+            <div class="detail-amount">${formatAmountAgorot(input.payment.amountAgorot)}</div>
+            <span class="${getStatusBadgeClass(input.payment.status)}">${getPaymentStatusLabel(input.payment.status)}</span>
+          </div>
         </div>
-        <div class="hero-panel">
-          <strong>סטטוס נוכחי</strong>
-          <span class="${getStatusBadgeClass(input.payment.status)}">${getPaymentStatusLabel(input.payment.status)}</span>
+
+        <p class="section-label" style="margin-bottom:10px;">פרטי לקוח</p>
+        <div class="summary-grid">
+          <div class="summary-cell">
+            <strong>שם לקוח</strong>
+            <span>${escapeHtml(input.payment.customerName)}</span>
+          </div>
+          <div class="summary-cell">
+            <strong>טלפון</strong>
+            <span>${escapeHtml(input.payment.customerPhone ?? "—")}</span>
+          </div>
+          <div class="summary-cell">
+            <strong>אימייל</strong>
+            <span>${escapeHtml(input.payment.customerEmail ?? "—")}</span>
+          </div>
         </div>
-      </section>
 
-      <div class="card-stack">
-        <section class="card">
+        <p class="section-label" style="margin-top:20px;margin-bottom:10px;">קישור תשלום</p>
+        <div class="inline-code">${escapeHtml(input.payment.paymentUrl ?? "קישור התשלום עדיין לא זמין")}</div>
+        <div class="btn-row">
           ${
-            input.simulatorMessage
-              ? input.simulatorOutcome === "failed"
-                ? `<div class="error-box">${escapeHtml(input.simulatorMessage)}</div>`
-                : input.simulatorOutcome === "duplicate"
-                  ? `<div class="warning-box">${escapeHtml(input.simulatorMessage)}</div>`
-                  : `<div class="success-box">${escapeHtml(input.simulatorMessage)}</div>`
-              : ""
-          }
-          ${
-            input.invoiceMessage
-              ? input.invoiceOutcome === "failed"
-                ? `<div class="error-box">${escapeHtml(input.invoiceMessage)}</div>`
-                : input.invoiceOutcome === "existing"
-                  ? `<div class="warning-box">${escapeHtml(input.invoiceMessage)}</div>`
-                  : `<div class="success-box">${escapeHtml(input.invoiceMessage)}</div>`
-              : ""
-          }
-          <div class="section-head">
-            <div>
-              <h3>פרטי העסקה</h3>
-              <p>המידע המרכזי הנדרש לצפייה, שיתוף ומעקב.</p>
-            </div>
-          </div>
-          <div class="summary-grid">
-            <div class="summary-card">
-              <strong>לקוח</strong>
-              <span>${escapeHtml(input.payment.customerName)}</span>
-            </div>
-            <div class="summary-card">
-              <strong>טלפון</strong>
-              <span>${escapeHtml(input.payment.customerPhone ?? "—")}</span>
-            </div>
-            <div class="summary-card">
-              <strong>אימייל</strong>
-              <span>${escapeHtml(input.payment.customerEmail ?? "—")}</span>
-            </div>
-            <div class="summary-card">
-              <strong>סכום</strong>
-              <span>${formatAmountAgorot(input.payment.amountAgorot)}</span>
-            </div>
-            <div class="summary-card">
-              <strong>סטטוס תשלום</strong>
-              <span>${getPaymentStatusLabel(input.payment.status)}</span>
-            </div>
-            <div class="summary-card">
-              <strong>תיאור</strong>
-              <span>${escapeHtml(input.payment.description)}</span>
-            </div>
-          </div>
-
-          <div class="section-head" style="margin-top: 24px;">
-            <div>
-              <h3>קישור תשלום</h3>
-              <p>אפשר להעתיק את הקישור או לפתוח הודעה מוכנה לשליחה ב-WhatsApp.</p>
-            </div>
-          </div>
-          <div class="inline-code">${escapeHtml(input.payment.paymentUrl ?? "קישור התשלום עדיין לא זמין")}</div>
-          <div class="button-row">
-            ${
-              input.payment.paymentUrl
-                ? `
-                  <span class="copy-toast-anchor">
-                    <button
-                      type="button"
-                      data-copy-text="${escapeHtml(input.payment.paymentUrl)}"
-                      data-copy-feedback="copy-feedback"
-                    >
-                      העתקת קישור
-                    </button>
-                    <span id="copy-feedback" class="copy-toast" aria-live="polite"></span>
-                  </span>
-                  <a class="button secondary" href="${escapeHtml(input.payment.paymentUrl)}" target="_blank" rel="noreferrer">פתיחת קישור תשלום</a>
-                `
-                : ""
-            }
-            ${
-              whatsappLink
-                ? `<a class="button whatsapp" href="${escapeHtml(whatsappLink)}" target="_blank" rel="noreferrer">פתיחת WhatsApp</a>`
-                : ""
-            }
-            <a class="button secondary" href="/admin/payments">חזרה לרשימה</a>
-          </div>
-        </section>
-
-        <section class="split-grid">
-          <section class="card">
-            <div class="section-head">
-              <div>
-                <h3>מסמך</h3>
-                <p>המסמך הנלווה לעסקה יוצג כאן כאשר הוא זמין.</p>
-              </div>
-            </div>
-            ${renderInvoiceSection({
-              payment: input.payment,
-              invoice: input.invoice
-            })}
-          </section>
-
-          <section class="card">
-            <div class="section-head">
-              <div>
-                <h3>תאריכים חשובים</h3>
-                <p>סקירה מהירה של אבני הדרך העיקריות בעסקה.</p>
-              </div>
-            </div>
-            ${renderTimeline(input.payment)}
-          </section>
-        </section>
-
-        <section class="card">
-          <details class="disclosure">
-            <summary>פרטים טכניים</summary>
-            <div class="disclosure-content">
-              <div class="technical-grid">
-                <div class="technical-item">
-                  <strong>מזהה תשלום</strong>
-                  ${escapeHtml(input.payment.id)}
-                </div>
-                <div class="technical-item">
-                  <strong>סטטוס פנימי</strong>
-                  ${escapeHtml(input.payment.status)}
-                </div>
-                <div class="technical-item">
-                  <strong>ספק</strong>
-                  ${escapeHtml(getProviderLabel(input.payment.provider))}
-                </div>
-                <div class="technical-item">
-                  <strong>מזהה תשלום אצל הספק</strong>
-                  ${escapeHtml(input.payment.providerPaymentId ?? "—")}
-                </div>
-                <div class="technical-item">
-                  <strong>מזהה עסקה אצל הספק</strong>
-                  ${escapeHtml(input.payment.providerTransactionId ?? "—")}
-                </div>
-                <div class="technical-item">
-                  <strong>מזהה מסמך במערכת</strong>
-                  ${escapeHtml(input.payment.invoiceId ?? "—")}
-                </div>
-              </div>
-              <details class="disclosure">
-                <summary>אירועי וובהוק</summary>
-                <div class="disclosure-content">
-                  ${renderWebhookRecords(input.webhooks)}
-                </div>
-              </details>
-            </div>
-          </details>
-
-          ${
-            input.appConfig.enableDevTools
+            input.payment.paymentUrl
               ? `
-                <details class="disclosure">
-                  <summary>כלי הדגמה</summary>
-                  <div class="disclosure-content">
-                    <p style="margin: 0; color: var(--ink-soft); line-height: 1.8;">
-                      פעולות אלו נועדו להדגמה מבוקרת של מעבר בין מצבי תשלום ויצירת מסמך דמו.
-                    </p>
-                    ${renderSimulatorForms(input.payment, `/admin/payments/${input.payment.id}`)}
-                    <div class="note">פעולות ההדגמה אינן משנות את מבנה המערכת וניתן להשתמש בהן רק לצורך הצגה ובדיקה.</div>
-                  </div>
-                </details>
-              `
+            <span class="copy-anchor">
+              <button type="button" class="btn btn-primary" data-copy-text="${escapeHtml(input.payment.paymentUrl)}" data-copy-feedback="copy-feedback">העתקת קישור</button>
+              <span id="copy-feedback" class="copy-toast" aria-live="polite"></span>
+            </span>
+            <a class="btn btn-secondary" href="${escapeHtml(input.payment.paymentUrl)}" target="_blank" rel="noreferrer">פתיחת קישור</a>`
               : ""
           }
-        </section>
+          ${whatsappLink ? `<a class="btn btn-whatsapp" href="${escapeHtml(whatsappLink)}" target="_blank" rel="noreferrer">WhatsApp</a>` : ""}
+          <a class="btn btn-secondary" href="/admin/payments">חזרה לרשימה</a>
+        </div>
+      </div>
+
+      <div class="split-grid">
+        <div class="card">
+          <div class="card-header"><h3>מסמך</h3></div>
+          ${renderInvoiceSection({ payment: input.payment, invoice: input.invoice })}
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3>ציר זמן</h3></div>
+          ${renderTimeline(input.payment)}
+        </div>
+      </div>
+
+      <div class="card">
+        <details class="disclosure">
+          <summary>פרטים טכניים</summary>
+          <div class="disclosure-body">
+            <div class="tech-grid" style="margin-top:4px;">
+              <div class="tech-field"><strong>מזהה תשלום</strong><span>${escapeHtml(input.payment.id)}</span></div>
+              <div class="tech-field"><strong>ספק</strong><span>${escapeHtml(getProviderLabel(input.payment.provider))}</span></div>
+              <div class="tech-field"><strong>מזהה ספק</strong><span>${escapeHtml(input.payment.providerPaymentId ?? "—")}</span></div>
+              <div class="tech-field"><strong>מזהה עסקה</strong><span>${escapeHtml(input.payment.providerTransactionId ?? "—")}</span></div>
+              <div class="tech-field"><strong>מזהה מסמך</strong><span>${escapeHtml(input.payment.invoiceId ?? "—")}</span></div>
+              <div class="tech-field"><strong>סטטוס פנימי</strong><span>${escapeHtml(input.payment.status)}</span></div>
+            </div>
+            <details class="disclosure" style="margin-top:4px;">
+              <summary>אירועי Webhook</summary>
+              <div class="disclosure-body">
+                ${renderWebhookRecords(input.webhooks)}
+              </div>
+            </details>
+          </div>
+        </details>
+
+        ${
+          input.appConfig.enableDevTools
+            ? `
+          <details class="disclosure" style="margin-top:12px;">
+            <summary>כלי הדגמה</summary>
+            <div class="disclosure-body">
+              <div class="alert alert-info">
+                פעולות אלו נועדו להדגמה מבוקרת של מעבר בין מצבי תשלום ויצירת מסמך דמו.
+              </div>
+              ${renderSimulatorForms(input.payment, `/admin/payments/${input.payment.id}`)}
+            </div>
+          </details>`
+            : ""
+        }
       </div>
     `
   });
@@ -2116,60 +1936,41 @@ export function renderMockGrowPaymentPage(input: {
     appConfig: input.appConfig,
     title: "עמוד תשלום דמו",
     activePath: "payments",
-    pageTitle: "הדגמת תשלום",
     content: `
-      <section class="hero">
-        <div>
-          <h2>עמוד תשלום דמו</h2>
-          <p>עמוד זה מיועד להדגמה בלבד ומשמש להצגת תהליך התשלום והעדכון במערכת.</p>
+      <div class="card" style="margin-bottom:20px;">
+        <p class="section-label">הדגמת תשלום</p>
+        <div class="summary-grid">
+          <div class="summary-cell">
+            <strong>לקוח</strong>
+            <span>${escapeHtml(input.payment.customerName)}</span>
+          </div>
+          <div class="summary-cell">
+            <strong>סכום</strong>
+            <span>${formatAmountAgorot(input.payment.amountAgorot)}</span>
+          </div>
+          <div class="summary-cell">
+            <strong>סטטוס</strong>
+            <span><span class="${getStatusBadgeClass(input.payment.status)}">${getPaymentStatusLabel(input.payment.status)}</span></span>
+          </div>
         </div>
-        <div class="hero-panel">
-          <strong>לקוח</strong>
-          <span>${escapeHtml(input.payment.customerName)}</span>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><h3>פעולות הדגמה</h3></div>
+        <p style="color:var(--ink-soft);font-size:0.875rem;margin-bottom:14px;">בחירת תוצאה מדגימה את עדכון הסטטוס במסך העסקה.</p>
+        ${renderSimulatorForms(input.payment, `/dev/mock-grow/pay/${input.payment.providerPaymentId ?? ""}`)}
+      </div>
+
+      <div class="card">
+        <details class="disclosure">
+          <summary>אירועי Webhook שנשמרו</summary>
+          <div class="disclosure-body">
+            ${renderWebhookRecords(input.webhooks)}
+          </div>
+        </details>
+        <div class="btn-row" style="margin-top:14px;">
+          <a class="btn btn-secondary" href="/admin/payments/${input.payment.id}">חזרה לפרטי העסקה</a>
         </div>
-      </section>
-      <div class="card-stack">
-        <section class="card">
-          <div class="summary-grid">
-            <div class="summary-card">
-              <strong>סכום</strong>
-              <span>${formatAmountAgorot(input.payment.amountAgorot)}</span>
-            </div>
-            <div class="summary-card">
-              <strong>תיאור</strong>
-              <span>${escapeHtml(input.payment.description)}</span>
-            </div>
-            <div class="summary-card">
-              <strong>סטטוס</strong>
-              <span>${getPaymentStatusLabel(input.payment.status)}</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="section-head">
-            <div>
-              <h3>פעולות הדגמה</h3>
-              <p>בחירת תוצאה מדגימה את עדכון הסטטוס במסך העסקה.</p>
-            </div>
-          </div>
-          ${renderSimulatorForms(
-            input.payment,
-            `/dev/mock-grow/pay/${input.payment.providerPaymentId ?? ""}`
-          )}
-        </section>
-
-        <section class="card">
-          <details class="disclosure">
-            <summary>אירועי וובהוק שנשמרו</summary>
-            <div class="disclosure-content">
-              ${renderWebhookRecords(input.webhooks)}
-            </div>
-          </details>
-          <div class="button-row">
-            <a class="button secondary" href="/admin/payments/${input.payment.id}">חזרה לפרטי העסקה</a>
-          </div>
-        </section>
       </div>
     `
   });
@@ -2184,65 +1985,49 @@ export function renderMockInvoicePage(input: {
     appConfig: input.appConfig,
     title: "מסמך דמו",
     activePath: "payments",
-    pageTitle: "מסמך לצפייה",
     content: `
-      <section class="hero">
-        <div>
-          <h2>מסמך דמו לצפייה</h2>
-          <p>זהו מסמך תצוגה בלבד המשמש להדגמת הזרימה לאחר אישור תשלום.</p>
-        </div>
-        <div class="hero-panel">
-          <strong>מספר מסמך</strong>
-          <span>${escapeHtml(input.invoice.invoiceNumber ?? input.invoice.id)}</span>
-        </div>
-      </section>
-      <section class="card">
+      <div class="card">
+        <p class="section-label">מסמך לצפייה בלבד</p>
         <div class="summary-grid">
-          <div class="summary-card">
+          <div class="summary-cell">
             <strong>לקוח</strong>
             <span>${escapeHtml(input.payment.customerName)}</span>
           </div>
-          <div class="summary-card">
+          <div class="summary-cell">
             <strong>סכום</strong>
             <span>${formatAmountAgorot(input.payment.amountAgorot)}</span>
           </div>
-          <div class="summary-card">
-            <strong>סטטוס</strong>
+          <div class="summary-cell">
+            <strong>סטטוס מסמך</strong>
             <span>${getInvoiceStatusLabel(input.invoice.status)}</span>
           </div>
-          <div class="summary-card">
+          <div class="summary-cell">
             <strong>תיאור</strong>
             <span>${escapeHtml(input.payment.description)}</span>
           </div>
-          <div class="summary-card">
-            <strong>נוצר בתאריך</strong>
+          <div class="summary-cell">
+            <strong>נוצר</strong>
             <span>${formatDateTime(input.invoice.createdAt)}</span>
           </div>
-          <div class="summary-card">
-            <strong>עודכן בתאריך</strong>
+          <div class="summary-cell">
+            <strong>עודכן</strong>
             <span>${formatDateTime(input.invoice.updatedAt)}</span>
           </div>
         </div>
-        <div class="note">המסמך המוצג כאן מיועד להדגמה בלבד ואינו מהווה מסמך חשבונאי או משפטי.</div>
-        <details class="disclosure">
+        <div class="alert alert-info" style="margin-top:16px;">המסמך המוצג מיועד להדגמה בלבד ואינו מסמך חשבונאי או משפטי.</div>
+        <details class="disclosure" style="margin-top:14px;">
           <summary>פרטים טכניים</summary>
-          <div class="disclosure-content">
-            <div class="technical-grid">
-              <div class="technical-item">
-                <strong>מזהה תשלום</strong>
-                ${escapeHtml(input.payment.id)}
-              </div>
-              <div class="technical-item">
-                <strong>מזהה מסמך אצל הספק</strong>
-                ${escapeHtml(input.invoice.providerInvoiceId ?? "—")}
-              </div>
+          <div class="disclosure-body">
+            <div class="tech-grid" style="margin-top:4px;">
+              <div class="tech-field"><strong>מזהה תשלום</strong><span>${escapeHtml(input.payment.id)}</span></div>
+              <div class="tech-field"><strong>מזהה מסמך ספק</strong><span>${escapeHtml(input.invoice.providerInvoiceId ?? "—")}</span></div>
             </div>
           </div>
         </details>
-        <div class="button-row">
-          <a class="button secondary" href="/admin/payments/${escapeHtml(input.payment.id)}">חזרה לפרטי העסקה</a>
+        <div class="btn-row" style="margin-top:16px;">
+          <a class="btn btn-secondary" href="/admin/payments/${escapeHtml(input.payment.id)}">חזרה לפרטי העסקה</a>
         </div>
-      </section>
+      </div>
     `
   });
 }
@@ -2252,66 +2037,47 @@ export function renderClientRequirementsPage(input: { appConfig: AppConfig }) {
     appConfig: input.appConfig,
     title: "סטטוס מערכת",
     activePath: "dashboard",
-    pageTitle: "מידע ניהולי",
     content: `
-      <section class="hero">
-        <div>
-          <h2>סטטוס מערכת</h2>
-          <p>תצוגה מרוכזת של סביבת העבודה הנוכחית, אפשרויות הניהול הזמינות והקישורים התפעוליים במערכת.</p>
-        </div>
-        <div class="hero-panel">
-          <strong>סביבה פעילה</strong>
-          <span>${escapeHtml(getEnvironmentLabel(input.appConfig.appEnv))}</span>
-        </div>
-      </section>
-      <section class="split-grid">
-        <section class="card">
-          <div class="section-head">
-            <div>
-              <h3>תצורת הדגמה</h3>
-              <p>פרטי הסביבה הרלוונטיים לשימוש השוטף במסך ההדגמה.</p>
+      <div class="split-grid">
+        <div class="card">
+          <div class="card-header"><h3>תצורת הסביבה</h3></div>
+          <div class="summary-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+            <div class="summary-cell">
+              <strong>סביבה</strong>
+              <span>${escapeHtml(getEnvironmentLabel(input.appConfig.appEnv))}</span>
             </div>
-          </div>
-          <div class="summary-grid">
-            <div class="summary-card">
+            <div class="summary-cell">
               <strong>מצב תשלום</strong>
               <span>${escapeHtml(getGrowModeLabel(input.appConfig))}</span>
             </div>
-            <div class="summary-card">
+            <div class="summary-cell">
               <strong>מצב מסמכים</strong>
               <span>${input.appConfig.invoiceMode === "mock" ? "דמו" : escapeHtml(input.appConfig.invoiceMode)}</span>
             </div>
-            <div class="summary-card">
-              <strong>כלי הדגמה</strong>
-              <span>${input.appConfig.enableDevTools ? "זמינים" : "כבויים"}</span>
-            </div>
           </div>
-          <div class="note">לצורך הדגמה הלקוח רואה סביבת עבודה מלאה, אך ללא חיבור חי לשירותי תשלום או מסמכים חיצוניים.</div>
-        </section>
+          <div class="alert alert-info" style="margin-top:16px;">
+            בסביבת הדגמה הלקוח רואה את המערכת המלאה ללא חיבור לשירותים חיצוניים.
+          </div>
+        </div>
 
-        <section class="card">
-          <div class="section-head">
-            <div>
-              <h3>פעולות ניהול</h3>
-              <p>קישורים מהירים לפעולות שימושיות בזמן הדגמה או עבודה שוטפת.</p>
-            </div>
-          </div>
-          <div class="quick-actions">
-            <a class="quick-action" href="/admin/payments/export.csv">
-              <strong>ייצוא נתונים</strong>
-              <span>הורדת קובץ CSV מרשימת העסקאות לצורכי בקרה ושיתוף.</span>
+        <div class="card">
+          <div class="card-header"><h3>פעולות</h3></div>
+          <div class="quick-links">
+            <a class="quick-link" href="/admin/payments/export.csv">
+              <span>ייצוא נתונים</span>
+              <span class="quick-link-arrow">‹</span>
             </a>
-            <a class="quick-action" href="/admin/payments/new">
-              <strong>בקשה חדשה</strong>
-              <span>פתיחת בקשת תשלום חדשה מתוך מסך מרוכז ונקי.</span>
+            <a class="quick-link" href="/admin/payments/new">
+              <span>בקשה חדשה</span>
+              <span class="quick-link-arrow">‹</span>
             </a>
-            <a class="quick-action" href="/admin/payments">
-              <strong>מעקב אחר עסקאות</strong>
-              <span>גישה לכל העסקאות, הסטטוסים והמסמכים שנוצרו.</span>
+            <a class="quick-link" href="/admin/payments">
+              <span>מעקב עסקאות</span>
+              <span class="quick-link-arrow">‹</span>
             </a>
           </div>
-        </section>
-      </section>
+        </div>
+      </div>
     `
   });
 }
@@ -2327,20 +2093,16 @@ export function renderStatusPage(input: {
     appConfig: input.appConfig,
     title: `${input.headline} — נמרודי ושות׳`,
     activePath: "dashboard",
-    pageTitle: `שגיאה ${input.statusCode}`,
     content: `
-      <section class="card status-page">
-        <div class="section-head">
-          <div>
-            <h3>${escapeHtml(input.headline)}</h3>
-            <p>${escapeHtml(input.message)}</p>
-          </div>
+      <div class="card status-page">
+        <p class="section-label">שגיאה ${input.statusCode}</p>
+        <h3 style="margin:0 0 8px;font-size:1.1rem;">${escapeHtml(input.headline)}</h3>
+        <p style="color:var(--ink-soft);margin:0 0 20px;line-height:1.65;">${escapeHtml(input.message)}</p>
+        <div class="btn-row">
+          <a class="btn btn-secondary" href="/">חזרה לדשבורד</a>
+          <a class="btn btn-secondary" href="/admin/payments">רשימת עסקאות</a>
         </div>
-        <div class="button-row">
-          <a class="button secondary" href="/">חזרה ללוח הבקרה</a>
-          <a class="button secondary" href="/admin/payments">מעבר לרשימת העסקאות</a>
-        </div>
-      </section>
+      </div>
     `
   });
 }
