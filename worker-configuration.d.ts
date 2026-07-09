@@ -4,7 +4,9 @@ interface Env {
   APP_ENV: "development";
   DEFAULT_PAYMENT_PROVIDER: "mock-grow";
   GROW_MODE: "mock";
+  ALLOW_MOCK_GROW_IN_PRODUCTION: "false";
   INVOICE_MODE: "mock";
   ENABLE_DEV_TOOLS: "true";
+  GROW_FORCE_BANK_TRANSFER_ONLY: "false";
   DB: D1Database;
 }

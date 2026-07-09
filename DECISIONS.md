@@ -327,6 +327,60 @@
   - deployment automation is not fully active yet
   - the final production rollout still depends on client-owned Cloudflare credentials and environment setup
 
+## Why the real Grow provider is behind config
+
+- The codebase now supports both `MockPaymentProvider` and `GrowPaymentProvider`, but the real provider is selected only through validated runtime config.
+- Meaning:
+  - the same architecture supports local development, sandbox trials, and later production rollout
+  - route handlers and domain services remain provider-agnostic
+- Tradeoff:
+  - startup configuration is stricter and more verbose
+
+## Why mock remains the default
+
+- The client has not yet provided all verified GROW account details, endpoints, and webhook payload examples.
+- Meaning:
+  - the app remains runnable and fully testable without any external credentials
+  - development can continue without pretending that a real provider is ready
+- Tradeoff:
+  - the default developer experience is intentionally conservative rather than "real by default"
+
+## Grow request mapping assumptions
+
+- The request mapping for `createPaymentProcess` is isolated in `src/infrastructure/grow/grow-request-mapper.ts`.
+- Meaning:
+  - all unverified field-name assumptions live in one place and are easy to review or replace once the client sandbox is available
+  - route handlers and services do not need to know Grow-specific request details
+- Tradeoff:
+  - the current mapper is only a best-effort bridge until verified against a real GROW sandbox account
+
+## Why real Grow webhook parsing is still not implemented
+
+- No verified sandbox or production webhook payload examples exist locally yet.
+- Meaning:
+  - `/api/grow/webhook` stays public but returns `501 Not Implemented`
+  - the already working mock webhook flow continues to prove the business-critical backend path safely
+- Tradeoff:
+  - real provider status updates still cannot be processed end-to-end
+
+## Bank-transfer-only verification decision
+
+- The config now includes `GROW_FORCE_BANK_TRANSFER_ONLY`, but no Grow request field is sent for it yet.
+- Meaning:
+  - the product can track the office requirement and surface it in settings
+  - the app avoids fabricating an unverified payment-method field in real API calls
+- Tradeoff:
+  - bank-transfer-only remains a blocked requirement until verified with GROW/client account details
+
+## Production mock-mode guard
+
+- `APP_ENV=production` with `GROW_MODE=mock` is blocked unless `ALLOW_MOCK_GROW_IN_PRODUCTION=true`.
+- Meaning:
+  - the system does not silently stay in fake payment mode during a production deployment
+  - temporary controlled production-like deployments can still be unblocked intentionally
+- Tradeoff:
+  - one more config flag must be understood and documented by operators
+
 ## Why the mock invoice page is not a legal document
 
 - The mock invoice page exists only to verify orchestration and stored data during development.

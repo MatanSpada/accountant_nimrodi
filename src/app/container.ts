@@ -1,10 +1,10 @@
 import type { CustomerRepository } from "../domain/customers/customer-repository";
 import type { PaymentRepository } from "../domain/payments/payment-repository";
+import type { PaymentProvider } from "../domain/payments/payment-provider";
 import { InMemoryPaymentRepository } from "../infrastructure/db/in-memory-payment-repository";
 import { InMemoryCustomerRepository } from "../infrastructure/db/in-memory-customer-repository";
 import { MockCRMProvider } from "../infrastructure/crm/mock-crm-provider";
 import { MockInvoiceProvider } from "../infrastructure/invoices/mock-invoice-provider";
-import { MockPaymentProvider } from "../infrastructure/grow/mock-payment-provider";
 import { PaymentService } from "../domain/payments/payment-service";
 import { D1PaymentRepository } from "../infrastructure/db/d1-payment-repository";
 import { D1CustomerRepository } from "../infrastructure/db/d1-customer-repository";
@@ -14,6 +14,8 @@ import { InvoiceService } from "../domain/invoices/invoice-service";
 import type { InvoiceRepository } from "../domain/invoices/invoice-repository";
 import { D1InvoiceRepository } from "../infrastructure/db/d1-invoice-repository";
 import { InMemoryInvoiceRepository } from "../infrastructure/db/in-memory-invoice-repository";
+import { createPaymentProvider } from "../infrastructure/grow/payment-provider-factory";
+import { getAppConfig, type AppConfig } from "../shared/config/app-config";
 
 export function createContainer(
   env?: Env,
@@ -21,8 +23,11 @@ export function createContainer(
     paymentRepository?: PaymentRepository;
     customerRepository?: CustomerRepository;
     invoiceRepository?: InvoiceRepository;
-  }
+    paymentProvider?: PaymentProvider;
+  },
+  config?: AppConfig
 ) {
+  const appConfig = config ?? getAppConfig(env);
   const paymentRepository =
     overrides?.paymentRepository ??
     (env?.DB
@@ -38,7 +43,8 @@ export function createContainer(
     (env?.DB
       ? new D1InvoiceRepository(env.DB)
       : new InMemoryInvoiceRepository());
-  const paymentProvider = new MockPaymentProvider();
+  const paymentProvider =
+    overrides?.paymentProvider ?? createPaymentProvider(appConfig);
   const invoiceProvider = new MockInvoiceProvider();
   const crmProvider = new MockCRMProvider();
   const invoiceService = new InvoiceService({

@@ -1,19 +1,36 @@
 import type { Hono } from "hono";
 
 import type { AppConfig } from "../shared/config/app-config";
+import { AppError } from "../shared/errors/app-error";
 
 export function registerReadyRoutes(
   app: Hono<{ Bindings: Env }>,
   getConfig: (env?: Env) => AppConfig
 ) {
   app.get("/ready", async (c) => {
-    getConfig(c.env);
+    try {
+      getConfig(c.env);
+    } catch (error) {
+      return c.json(
+        {
+          status: "config_error",
+          phase: "7/8",
+          checks: {
+            config: "failed",
+            db: "unknown"
+          },
+          error:
+            error instanceof AppError ? error.message : "אירעה שגיאת תצורה."
+        },
+        500
+      );
+    }
 
     if (!c.env?.DB) {
       return c.json(
         {
           status: "not_ready",
-          phase: "6/8",
+          phase: "7/8",
           checks: {
             config: "ok",
             db: "missing_binding"
@@ -27,7 +44,7 @@ export function registerReadyRoutes(
 
     return c.json({
       status: "ready",
-      phase: "6/8",
+      phase: "7/8",
       checks: {
         config: "ok",
         db: "ok"

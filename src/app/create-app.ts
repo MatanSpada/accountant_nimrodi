@@ -17,14 +17,15 @@ export function createApp(options?: {
   getConfig?: (env?: Env) => AppConfig;
 }) {
   const app = new Hono<{ Bindings: Env }>();
-  const getContainer =
-    options?.getContainer ?? ((env?: Env) => createContainer(env));
   const getConfig = options?.getConfig ?? ((env?: Env) => getAppConfig(env));
+  const getContainer =
+    options?.getContainer ??
+    ((env?: Env) => createContainer(env, undefined, getConfig(env)));
 
   app.use("*", requestLoggerMiddleware);
   app.use("*", errorMiddleware);
 
-  registerHealthRoutes(app);
+  registerHealthRoutes(app, getConfig);
   registerReadyRoutes(app, getConfig);
   registerAuthRoutes(app, getConfig);
   app.use("*", accessControlMiddleware(getConfig));

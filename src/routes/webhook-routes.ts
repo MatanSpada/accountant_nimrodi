@@ -30,7 +30,7 @@ export function registerWebhookRoutes(
     c.json(
       {
         error:
-          "Real GROW webhook integration is not implemented yet. Use /api/mock-grow/webhook in development."
+          "Real GROW webhook parsing requires verified sandbox/production payload examples."
       },
       501
     )

@@ -14,7 +14,8 @@
     "format:check": "prettier --check .",
     "cf-typegen": "wrangler types",
     "db:migrate:local": "wrangler d1 migrations apply nimrodi_payments --local",
-    "db:execute:local": "wrangler d1 execute nimrodi_payments --local --file"
+    "db:execute:local": "wrangler d1 execute nimrodi_payments --local --file",
+    "grow:smoke": "node scripts/grow-smoke.mjs"
   },
   "dependencies": {
     "hono": "^4.12.28"

@@ -116,7 +116,7 @@ describe("app routes", () => {
     });
     expect(growWebhookResponse.status).toBe(501);
     expect(await growWebhookResponse.text()).toContain(
-      "Use /api/mock-grow/webhook in development."
+      "verified sandbox/production payload examples"
     );
   });
 
@@ -288,6 +288,47 @@ describe("app routes", () => {
       }
     );
     expect(blockedMockPage.status).toBe(404);
+  });
+
+  it("shows Grow mode and missing client requirements on the settings page", async () => {
+    const { app } = createTestApp();
+    const session = await login(app, "test-admin-password");
+
+    const response = await app.request("/admin/settings/client-requirements", {
+      headers: {
+        cookie: session.cookie ?? ""
+      }
+    });
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("GROW_MODE");
+    expect(html).toContain("mock");
+    expect(html).toContain("payloads מאומתים של webhook מ-sandbox");
+  });
+
+  it("returns a clear safe health error when sandbox config is incomplete", async () => {
+    const app = createApp({
+      getConfig: () =>
+        getAppConfig({
+          APP_ENV: "staging",
+          ADMIN_PASSWORD: "staging-password",
+          SESSION_SECRET: "staging-secret",
+          GROW_MODE: "sandbox",
+          INVOICE_MODE: "mock",
+          ENABLE_DEV_TOOLS: "false"
+        })
+    });
+
+    const response = await app.request("/health");
+    expect(response.status).toBe(500);
+    const payload = (await response.json()) as {
+      status: string;
+      error: string;
+    };
+    expect(payload.status).toBe("config_error");
+    expect(payload.error).toContain("GROW_USER_ID");
+    expect(payload.error).not.toContain("secret");
   });
 
   it("renders protected admin pages and mock pages after login", async () => {

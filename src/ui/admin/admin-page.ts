@@ -271,6 +271,20 @@ function renderLayout(input: {
           color: var(--ink-soft);
           font-size: 0.9rem;
         }
+        .status-list {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: grid;
+          gap: 12px;
+        }
+        .status-list li {
+          padding: 14px 16px;
+          border-radius: 14px;
+          border: 1px solid var(--line);
+          background: var(--surface);
+          line-height: 1.6;
+        }
         .requirements-list {
           margin: 0;
           padding: 0 20px 0 0;
@@ -393,7 +407,7 @@ function renderLayout(input: {
               .join("")}
           </nav>
           <div class="sidebar-note">
-            שלב 5 עדיין עובד עם providers מדומים בלבד. תשלום ששולם יכול כעת להפעיל גם יצירת קבלה מדומה, בלי להתחבר עדיין ל-GROW או לספק מסמכים אמיתי.
+            המערכת בנויה לעבודה מודולרית מול GROW ו-provider קבלות. גם כאשר נוסיף GROW אמיתי, ה-mock flow נשאר זמין לפיתוח ולבדיקות בטוחות.
           </div>
         </aside>
         <main>
@@ -530,9 +544,17 @@ function renderLayout(input: {
 function renderSystemBanners(appConfig: AppConfig) {
   const banners: string[] = [];
 
-  if (appConfig.growMode === "mock" || appConfig.invoiceMode === "mock") {
+  if (appConfig.growMode === "mock") {
+    banners.push("מצב פיתוח: תשלומים מדומים.");
+  }
+
+  if (appConfig.growMode === "sandbox") {
+    banners.push("מצב בדיקות GROW: יצירת בקשות תשלום נשלחת ל-GROW sandbox.");
+  }
+
+  if (appConfig.invoiceMode === "mock") {
     banners.push(
-      "מצב פיתוח: התשלומים והקבלות מדומים. אין כאן חיבור אמיתי ל-GROW או לספק מסמכים אמיתי."
+      "מסמכים עדיין במצב mock. אין כאן עדיין חיבור אמיתי לספק קבלות או מסמכים."
     );
   }
 
@@ -551,6 +573,26 @@ function renderSystemBanners(appConfig: AppConfig) {
       ${banners.map((banner) => `<div class="banner">${escapeHtml(banner)}</div>`).join("")}
     </div>
   `;
+}
+
+function getGrowModeLabel(appConfig: AppConfig) {
+  if (appConfig.growMode === "mock") {
+    return "mock";
+  }
+
+  if (appConfig.growMode === "sandbox") {
+    return "sandbox";
+  }
+
+  return "production";
+}
+
+function getBankTransferOnlyLabel(appConfig: AppConfig) {
+  if (appConfig.growStatus.bankTransferOnlyStatus === "requested_unverified") {
+    return "הוגדר flag לבקשת bank-transfer-only, אבל התמיכה בשדה עדיין לא מאומתת ולכן הוא לא נשלח ל-GROW.";
+  }
+
+  return "לא התבקש bank-transfer-only ברמת config.";
 }
 
 function renderSimulatorForms(payment: Payment, redirectPath: string) {
@@ -862,14 +904,14 @@ export function renderDashboardPage(input: {
         </div>
         <div class="card">
           <h3>תמונת מצב</h3>
-          <p>המערכת מחוברת כבר ל-D1 המקומי, אך עדיין לא מחוברת ל-GROW אמיתי ולא ל-WhatsApp API.</p>
+          <p>המערכת מחוברת ל-D1 ויכולה לפעול במצב mock או מול GROW, לפי ה-config המאומת הזמין כרגע.</p>
           <div class="stats">
             <div class="stat">
               <strong>${input.payments.length}</strong>
               עסקאות אחרונות
             </div>
             <div class="stat">
-              <strong>Mock</strong>
+              <strong>${escapeHtml(getGrowModeLabel(input.appConfig))}</strong>
               provider פעיל
             </div>
             <div class="stat">
@@ -1274,11 +1316,33 @@ export function renderClientRequirementsPage(input: { appConfig: AppConfig }) {
         <p>העמוד הזה נשאר גלוי בכוונה כדי לייצר שקיפות לגבי מה עדיין חסר מהלקוח לפני מעבר ל-GROW אמיתי ול-production.</p>
       </section>
       <section class="card">
+        <h3>סטטוס GROW נוכחי</h3>
+        <ul class="status-list">
+          <li><strong>GROW_MODE</strong><br />${escapeHtml(getGrowModeLabel(input.appConfig))}</li>
+          <li><strong>Required config</strong><br />${input.appConfig.growStatus.hasRequiredConfig ? "קיים" : input.appConfig.growMode === "mock" ? "לא נדרש במצב mock" : "חסר"}</li>
+          <li><strong>notifyUrl</strong><br />${input.appConfig.growStatus.hasNotifyUrl ? "מוגדר" : "לא מוגדר"}</li>
+          <li><strong>invoiceNotifyUrl</strong><br />${input.appConfig.growStatus.hasInvoiceNotifyUrl ? "מוגדר" : "לא מוגדר / לא נדרש כרגע"}</li>
+          <li><strong>API key</strong><br />${input.appConfig.growStatus.hasApiKey ? "קיים" : "לא הוגדר. יש להשתמש רק אם החשבון/התיעוד המאומת דורשים אותו."}</li>
+          <li><strong>Bank-transfer-only</strong><br />${escapeHtml(getBankTransferOnlyLabel(input.appConfig))}</li>
+        </ul>
+        ${
+          input.appConfig.growStatus.missingFields.length > 0
+            ? `<div class="warning-box">חסרים שדות config עבור GROW: ${escapeHtml(input.appConfig.growStatus.missingFields.join(", "))}</div>`
+            : ""
+        }
+        ${
+          input.appConfig.appEnv === "production" &&
+          input.appConfig.growMode === "mock"
+            ? `<div class="warning-box">המערכת רצה ב-production עם mock mode רק כי הוגדר ALLOW_MOCK_GROW_IN_PRODUCTION=true. זה מתאים רק לפריסה זמנית ומבוקרת.</div>`
+            : ""
+        }
+      </section>
+      <section class="card">
         <h3>Checklist פתוח</h3>
         <ul class="requirements-list">
           ${CLIENT_REQUIREMENTS_ITEMS.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
         </ul>
-        <div class="note">בשלב זה אין אינטגרציית GROW אמיתית, אין Meta approval ל-WhatsApp API, ואין אימות משתמשים.</div>
+        <div class="note">בשלב זה parser אמיתי ל-webhook של GROW עדיין לא קיים. הוא יתווסף רק אחרי קבלת payloads מאומתים מ-sandbox ו/או production.</div>
       </section>
     `
   });
