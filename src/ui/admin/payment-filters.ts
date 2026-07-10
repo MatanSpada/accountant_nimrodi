@@ -22,7 +22,7 @@ export interface ParsedFilters {
   dateFromError?: string;
   dateToError?: string;
   customer?: string;
-  status?: PaymentStatus;
+  statuses?: PaymentStatus[]; // multi-select; undefined = no filter
   sortBy: SortField;
   sortDir: SortDir;
 }
@@ -70,8 +70,15 @@ export function parseFiltersFromQuery(
   const filters: ParsedFilters = { sortBy: "created_at", sortDir: "desc" };
 
   const status = query["status"];
-  if (status && isPaymentStatus(status)) {
-    filters.status = status;
+  if (status && status.trim()) {
+    const parts = status
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const valid = parts.filter(isPaymentStatus) as PaymentStatus[];
+    if (valid.length > 0) {
+      filters.statuses = valid;
+    }
   }
 
   const customer = query["customer"];
@@ -119,7 +126,7 @@ export function parseFiltersFromQuery(
 /** True when any non-sort filter is active (including invalid date entries). */
 export function hasActiveFilters(filters: ParsedFilters): boolean {
   return !!(
-    filters.status ||
+    (filters.statuses?.length ?? 0) > 0 ||
     filters.customer ||
     filters.dateFrom ||
     filters.dateTo ||
@@ -141,7 +148,7 @@ export function buildFilterUrl(
   extras: { offset?: number; limit?: number } = {}
 ): string {
   const p = new URLSearchParams();
-  if (filters.status) p.set("status", filters.status);
+  if (filters.statuses?.length) p.set("status", filters.statuses.join(","));
   if (filters.customer) p.set("customer", filters.customer);
   if (filters.dateFrom) {
     p.set("from", filters.dateFromDisplay ?? isoToDdMmYy(filters.dateFrom));
@@ -182,6 +189,7 @@ export function buildSortUrl(
 /**
  * Build chip descriptors for all active (successfully applied) filters.
  * Each chip has a label and a URL that removes only that filter.
+ * Status produces one chip per selected status so each can be removed individually.
  */
 export function buildChips(
   basePath: string,
@@ -190,11 +198,16 @@ export function buildChips(
 ): Array<{ label: string; removeUrl: string }> {
   const chips: Array<{ label: string; removeUrl: string }> = [];
 
-  if (filters.status) {
-    chips.push({
-      label: `סטטוס: ${getStatusLabel(filters.status)}`,
-      removeUrl: buildFilterUrl(basePath, { ...filters, status: undefined })
-    });
+  if (filters.statuses?.length) {
+    for (const status of filters.statuses) {
+      chips.push({
+        label: `סטטוס: ${getStatusLabel(status)}`,
+        removeUrl: buildFilterUrl(basePath, {
+          ...filters,
+          statuses: filters.statuses.filter((s) => s !== status)
+        })
+      });
+    }
   }
   if (filters.customer) {
     chips.push({
@@ -203,21 +216,14 @@ export function buildChips(
     });
   }
   if (filters.dateFrom) {
+    // Date range is always treated as a unit — removing from also removes to
     chips.push({
-      label: `מתאריך: ${filters.dateFromDisplay ?? isoToDdMmYy(filters.dateFrom)}`,
+      label: `טווח: ${filters.dateFromDisplay ?? isoToDdMmYy(filters.dateFrom)}–${filters.dateToDisplay ?? (filters.dateTo ? isoToDdMmYy(filters.dateTo) : "?")}`,
       removeUrl: buildFilterUrl(basePath, {
         ...filters,
         dateFrom: undefined,
         dateFromDisplay: undefined,
-        dateFromError: undefined
-      })
-    });
-  }
-  if (filters.dateTo) {
-    chips.push({
-      label: `עד: ${filters.dateToDisplay ?? isoToDdMmYy(filters.dateTo)}`,
-      removeUrl: buildFilterUrl(basePath, {
-        ...filters,
+        dateFromError: undefined,
         dateTo: undefined,
         dateToDisplay: undefined,
         dateToError: undefined

@@ -133,7 +133,7 @@ export function registerAdminRoutes(
       container.paymentService.listPayments({
         limit,
         offset,
-        status: filters.status,
+        statuses: filters.statuses,
         dateFrom: filters.dateFrom,
         dateTo: filters.dateTo,
         customer: filters.customer,

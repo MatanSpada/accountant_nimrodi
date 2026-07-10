@@ -47,7 +47,7 @@ export type PaymentSortDir = "asc" | "desc";
 export interface PaymentListOptions {
   limit?: number;
   offset?: number;
-  status?: PaymentStatus;
+  statuses?: PaymentStatus[]; // filter to any of these statuses
   dateFrom?: string; // ISO yyyy-mm-dd, inclusive
   dateTo?: string; // ISO yyyy-mm-dd, inclusive
   customer?: string; // partial match, case-insensitive

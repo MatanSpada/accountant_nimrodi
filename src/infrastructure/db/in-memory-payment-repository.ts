@@ -184,8 +184,13 @@ export class InMemoryPaymentRepository implements PaymentRepository {
       : null;
     const customerLower = options.customer?.toLowerCase();
 
+    const statusSet =
+      options.statuses && options.statuses.length > 0
+        ? new Set(options.statuses)
+        : null;
+
     const filtered = [...this.payments.values()].filter((payment) => {
-      if (options.status && payment.status !== options.status) return false;
+      if (statusSet && !statusSet.has(payment.status)) return false;
       if (dateFrom && new Date(payment.createdAt) < dateFrom) return false;
       if (dateTo && new Date(payment.createdAt) > dateTo) return false;
       if (

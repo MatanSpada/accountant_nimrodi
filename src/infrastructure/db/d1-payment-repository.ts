@@ -403,9 +403,10 @@ export class D1PaymentRepository implements PaymentRepository {
     const conditions: string[] = [];
     const params: (string | number)[] = [];
 
-    if (options.status) {
-      conditions.push("status = ?");
-      params.push(options.status);
+    if (options.statuses && options.statuses.length > 0) {
+      const placeholders = options.statuses.map(() => "?").join(", ");
+      conditions.push(`status IN (${placeholders})`);
+      params.push(...options.statuses);
     }
     if (options.dateFrom) {
       conditions.push("DATE(created_at) >= ?");

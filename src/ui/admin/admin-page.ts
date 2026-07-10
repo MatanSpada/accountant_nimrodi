@@ -1234,6 +1234,128 @@ const CSS = `
     font-size: 0.65rem;
     opacity: 0.9;
   }
+
+  /* ── Status multi-select dropdown ── */
+  .status-multi-wrap { position: relative; }
+
+  .status-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    width: 154px;
+    transition: border-color 150ms;
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .status-trigger:hover { border-color: var(--accent); }
+  .status-trigger:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.08); }
+  .status-trigger.has-selection { border-color: var(--accent); background: var(--accent-soft); color: #1d4ed8; }
+
+  .status-trigger-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .status-trigger-chevron { font-size: 0.6rem; opacity: 0.55; flex-shrink: 0; }
+
+  .status-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 180px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+    z-index: 200;
+    padding: 4px;
+  }
+
+  .status-opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 100ms;
+    color: var(--ink);
+    user-select: none;
+  }
+
+  .status-opt:hover { background: var(--surface-soft); }
+  .status-opt input[type="checkbox"] { cursor: pointer; flex-shrink: 0; accent-color: var(--accent); }
+
+  /* ── Date picker overlay ── */
+  .date-picker-wrap { position: relative; display: inline-flex; }
+
+  .date-display-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--ink);
+    width: 118px;
+    transition: border-color 150ms;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .date-display-btn:hover { border-color: var(--accent); }
+  .date-display-btn.has-value { color: var(--ink); }
+
+  .date-text:empty::before { content: 'dd/mm/yy'; color: var(--ink-faint); }
+
+  .cal-icon { flex-shrink: 0; opacity: 0.45; width: 14px; height: 14px; }
+
+  .date-native {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 1;
+  }
+
+  /* ── Date range error ── */
+  .date-range-error {
+    font-size: 0.72rem;
+    color: var(--danger);
+    flex-basis: 100%;
+    margin-top: -6px;
+  }
+
+  /* ── Filter inline clear link ── */
+  .filter-clear-link {
+    display: inline-flex;
+    align-items: center;
+    height: 34px;
+    padding: 0 10px;
+    font-size: 0.82rem;
+    color: var(--ink-faint);
+    text-decoration: none;
+    border-radius: 6px;
+    white-space: nowrap;
+    transition: background 120ms, color 120ms;
+    align-self: flex-end;
+  }
+
+  .filter-clear-link:hover { background: var(--surface-muted); color: var(--ink-soft); }
 `;
 
 const SHARED_JS = `
@@ -1302,39 +1424,239 @@ const SHARED_JS = `
 
 // ── Filter bar, chips, and sort header helpers ────────────────────────────────
 
+const FILTER_JS = `
+(function () {
+  'use strict';
+
+  function isoToDdMmYy(iso) {
+    if (!iso) return '';
+    var parts = iso.split('-');
+    if (parts.length !== 3) return '';
+    return parts[2] + '/' + parts[1] + '/' + parts[0].slice(2);
+  }
+
+  function getFilterState() {
+    var statuses = [];
+    document.querySelectorAll('.status-cb:checked').forEach(function (cb) {
+      statuses.push(cb.value);
+    });
+    var customerEl = document.getElementById('filter-customer');
+    var customer = customerEl ? customerEl.value.trim() : '';
+    var fromEl = document.getElementById('date-from-native');
+    var toEl = document.getElementById('date-to-native');
+    return {
+      statuses: statuses,
+      customer: customer,
+      from: fromEl ? fromEl.value : '',
+      to: toEl ? toEl.value : ''
+    };
+  }
+
+  function getSortParams() {
+    var p = new URLSearchParams(window.location.search);
+    return { sort: p.get('sort') || '', dir: p.get('dir') || '' };
+  }
+
+  function applyFilters() {
+    var state = getFilterState();
+    var sort = getSortParams();
+    var errEl = document.getElementById('date-range-error');
+
+    var applyDates = false;
+    if (state.from && state.to) {
+      if (state.from > state.to) {
+        if (errEl) { errEl.textContent = '\\u05EA\\u05D0\\u05E8\\u05D9\\u05DA \\u05D4\\u05E1\\u05D9\\u05D5\\u05DD \\u05D7\\u05D9\\u05D9\\u05D1 \\u05DC\\u05D4\\u05D9\\u05D5\\u05EA \\u05D0\\u05D7\\u05E8\\u05D9 \\u05EA\\u05D0\\u05E8\\u05D9\\u05DA \\u05D4\\u05D4\\u05EA\\u05D7\\u05DC\\u05D4'; errEl.hidden = false; }
+        return;
+      }
+      if (errEl) errEl.hidden = true;
+      applyDates = true;
+    } else {
+      if (errEl) errEl.hidden = true;
+    }
+
+    var params = new URLSearchParams();
+    if (state.statuses.length > 0) params.set('status', state.statuses.join(','));
+    if (state.customer) params.set('customer', state.customer);
+    if (applyDates) {
+      params.set('from', isoToDdMmYy(state.from));
+      params.set('to', isoToDdMmYy(state.to));
+    }
+    if (sort.sort) params.set('sort', sort.sort);
+    if (sort.dir) params.set('dir', sort.dir);
+    var qs = params.toString();
+    window.location.href = '/admin/payments' + (qs ? '?' + qs : '');
+  }
+
+  // ── Status dropdown ──────────────────────────────────────────────────────
+  function updateStatusTrigger() {
+    var trigger = document.getElementById('status-trigger');
+    var labelEl = document.getElementById('status-label');
+    if (!trigger || !labelEl) return;
+    var checked = [];
+    document.querySelectorAll('.status-cb').forEach(function (cb) {
+      if (cb.checked) checked.push({ value: cb.value, label: cb.dataset.label });
+    });
+    if (checked.length === 0) {
+      labelEl.textContent = '\\u05DB\\u05DC \\u05D4\\u05E1\\u05D8\\u05D8\\u05D5\\u05E1\\u05D9\\u05DD';
+      trigger.classList.remove('has-selection');
+    } else if (checked.length <= 2) {
+      labelEl.textContent = checked.map(function (c) { return c.label; }).join(', ');
+      trigger.classList.add('has-selection');
+    } else {
+      labelEl.textContent = checked.length + ' \\u05E1\\u05D8\\u05D8\\u05D5\\u05E1\\u05D9\\u05DD';
+      trigger.classList.add('has-selection');
+    }
+  }
+
+  function initStatusDropdown() {
+    var wrap = document.getElementById('status-multi');
+    var trigger = document.getElementById('status-trigger');
+    var panel = document.getElementById('status-panel');
+    if (!wrap || !trigger || !panel) return;
+
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = !panel.hidden;
+      panel.hidden = open;
+      trigger.setAttribute('aria-expanded', String(!open));
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!wrap.contains(e.target)) {
+        panel.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !panel.hidden) {
+        panel.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.focus();
+      }
+    });
+
+    document.querySelectorAll('.status-cb').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        updateStatusTrigger();
+        applyFilters();
+      });
+    });
+
+    updateStatusTrigger();
+  }
+
+  // ── Date pickers ─────────────────────────────────────────────────────────
+  function updateDateDisplay(nativeInput) {
+    var displayEl = document.getElementById(nativeInput.dataset.displayTarget);
+    if (!displayEl) return;
+    displayEl.textContent = nativeInput.value ? isoToDdMmYy(nativeInput.value) : '';
+  }
+
+  function initDatePickers() {
+    document.querySelectorAll('.date-native').forEach(function (input) {
+      updateDateDisplay(input);
+      input.addEventListener('change', function () {
+        updateDateDisplay(input);
+        var fromEl = document.getElementById('date-from-native');
+        var toEl = document.getElementById('date-to-native');
+        if (!fromEl || !toEl) return;
+        var from = fromEl.value;
+        var to = toEl.value;
+        if ((from && to) || (!from && !to)) {
+          applyFilters();
+        }
+      });
+    });
+  }
+
+  // ── Customer field ────────────────────────────────────────────────────────
+  function initCustomerField() {
+    var field = document.getElementById('filter-customer');
+    if (!field) return;
+    var blurTimer = null;
+
+    field.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(blurTimer);
+        applyFilters();
+      }
+    });
+
+    field.addEventListener('blur', function () {
+      blurTimer = setTimeout(applyFilters, 200);
+    });
+
+    field.addEventListener('focus', function () {
+      clearTimeout(blurTimer);
+    });
+
+    field.addEventListener('input', function (e) {
+      var list = document.getElementById('customer-autocomplete');
+      if (!list) return;
+      var opts = [];
+      list.querySelectorAll('option').forEach(function (o) { opts.push(o.value); });
+      if (opts.indexOf(e.target.value) !== -1) {
+        clearTimeout(blurTimer);
+        applyFilters();
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    initStatusDropdown();
+    initDatePickers();
+    initCustomerField();
+  });
+})();
+`;
+
 const BASE_PATH = "/admin/payments";
 
 function renderFilterBar(
   filters: ParsedFilters,
   customerNames: string[]
 ): string {
-  const clearSortUrl = buildFilterUrl(BASE_PATH, {
+  const hasActive = hasActiveFilters(filters);
+  const clearUrl = buildFilterUrl(BASE_PATH, {
     sortBy: filters.sortBy,
     sortDir: filters.sortDir
   });
+  const selectedStatuses = filters.statuses ?? [];
+  const calIcon = `<svg class="cal-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/><line x1="1.5" y1="6.5" x2="14.5" y2="6.5"/></svg>`;
+
   return `
-    <form class="filter-bar" method="GET" action="${BASE_PATH}">
+    <div class="filter-bar">
       <div class="filter-field">
         <span class="filter-field-label">מתאריך</span>
-        <input class="filter-input" type="text" name="from"
-          value="${escapeHtml(filters.dateFromDisplay ?? "")}"
-          placeholder="dd/mm/yy"
-          autocomplete="off"
-          maxlength="8" />
+        <div class="date-picker-wrap">
+          <div class="date-display-btn${filters.dateFrom ? " has-value" : ""}">
+            ${calIcon}
+            <span class="date-text" id="from-display">${escapeHtml(filters.dateFromDisplay ?? "")}</span>
+          </div>
+          <input type="date" id="date-from-native" class="date-native"
+            value="${escapeHtml(filters.dateFrom ?? "")}"
+            data-display-target="from-display" />
+        </div>
         ${filters.dateFromError ? `<span class="filter-error">${escapeHtml(filters.dateFromError)}</span>` : ""}
       </div>
       <div class="filter-field">
         <span class="filter-field-label">עד תאריך</span>
-        <input class="filter-input" type="text" name="to"
-          value="${escapeHtml(filters.dateToDisplay ?? "")}"
-          placeholder="dd/mm/yy"
-          autocomplete="off"
-          maxlength="8" />
+        <div class="date-picker-wrap">
+          <div class="date-display-btn${filters.dateTo ? " has-value" : ""}">
+            ${calIcon}
+            <span class="date-text" id="to-display">${escapeHtml(filters.dateToDisplay ?? "")}</span>
+          </div>
+          <input type="date" id="date-to-native" class="date-native"
+            value="${escapeHtml(filters.dateTo ?? "")}"
+            data-display-target="to-display" />
+        </div>
         ${filters.dateToError ? `<span class="filter-error">${escapeHtml(filters.dateToError)}</span>` : ""}
       </div>
       <div class="filter-field">
         <span class="filter-field-label">לקוח</span>
-        <input class="filter-input filter-input-wide" type="text" name="customer"
+        <input class="filter-input filter-input-wide" type="text" id="filter-customer"
           value="${escapeHtml(filters.customer ?? "")}"
           placeholder="שם לקוח"
           list="customer-autocomplete"
@@ -1345,21 +1667,40 @@ function renderFilterBar(
       </div>
       <div class="filter-field">
         <span class="filter-field-label">סטטוס</span>
-        <select class="filter-select" name="status">
-          <option value="">הכל</option>
-          ${PAYMENT_STATUSES.map(
-            (s) =>
-              `<option value="${s}"${filters.status === s ? " selected" : ""}>${PAYMENT_STATUS_LABELS[s]}</option>`
-          ).join("")}
-        </select>
+        <div class="status-multi-wrap" id="status-multi">
+          <button type="button"
+            class="status-trigger${selectedStatuses.length > 0 ? " has-selection" : ""}"
+            id="status-trigger"
+            aria-expanded="false"
+            aria-haspopup="listbox">
+            <span class="status-trigger-label" id="status-label">${
+              selectedStatuses.length === 0
+                ? "כל הסטטוסים"
+                : selectedStatuses.length <= 2
+                  ? selectedStatuses
+                      .map((s) => PAYMENT_STATUS_LABELS[s])
+                      .join(", ")
+                  : `${selectedStatuses.length} סטטוסים`
+            }</span>
+            <span class="status-trigger-chevron">▾</span>
+          </button>
+          <div class="status-panel" id="status-panel" hidden>
+            ${PAYMENT_STATUSES.map(
+              (s) => `
+            <label class="status-opt">
+              <input type="checkbox" class="status-cb"
+                value="${s}"
+                data-label="${escapeHtml(PAYMENT_STATUS_LABELS[s])}"
+                ${selectedStatuses.includes(s) ? "checked" : ""} />
+              ${escapeHtml(PAYMENT_STATUS_LABELS[s])}
+            </label>`
+            ).join("")}
+          </div>
+        </div>
       </div>
-      ${filters.sortBy !== "created_at" ? `<input type="hidden" name="sort" value="${filters.sortBy}" />` : ""}
-      ${filters.sortDir !== "desc" ? `<input type="hidden" name="dir" value="${filters.sortDir}" />` : ""}
-      <div class="filter-actions">
-        <button type="submit" class="btn btn-primary btn-sm">סינון</button>
-        ${hasActiveFilters(filters) ? `<a class="btn btn-ghost btn-sm" href="${escapeHtml(clearSortUrl)}">נקה</a>` : ""}
-      </div>
-    </form>`;
+      ${hasActive ? `<a class="filter-clear-link" href="${escapeHtml(clearUrl)}">נקה סינון</a>` : ""}
+      <div id="date-range-error" class="date-range-error" hidden></div>
+    </div>`;
 }
 
 function renderFilterChips(filters: ParsedFilters): string {
@@ -1382,7 +1723,7 @@ function renderFilterChips(filters: ParsedFilters): string {
         </span>`
         )
         .join("")}
-      ${chips.length > 1 ? `<a class="chips-clear" href="${escapeHtml(clearAllUrl)}">נקה הכל</a>` : ""}
+      ${chips.length > 1 ? `<a class="chips-clear" href="${escapeHtml(clearAllUrl)}">נקה הכל ×</a>` : ""}
     </div>`;
 }
 
@@ -2097,6 +2438,7 @@ export function renderPaymentsListPage(input: {
             : ""
         }
       </div>
+      <script>${FILTER_JS}</script>
     `
   });
 }

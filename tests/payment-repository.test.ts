@@ -173,11 +173,17 @@ describe("InMemoryPaymentRepository", () => {
       return repository;
     }
 
-    it("filters by status=paid", async () => {
+    it("filters by statuses=['paid']", async () => {
       const repo = await buildRepo();
-      const result = await repo.list({ status: "paid" });
+      const result = await repo.list({ statuses: ["paid"] });
       expect(result.items).toHaveLength(2);
       expect(result.items.every((p) => p.status === "paid")).toBe(true);
+    });
+
+    it("filters by multiple statuses", async () => {
+      const repo = await buildRepo();
+      const result = await repo.list({ statuses: ["paid", "pending"] });
+      expect(result.items).toHaveLength(3);
     });
 
     it("filters by dateFrom (inclusive)", async () => {
@@ -207,9 +213,12 @@ describe("InMemoryPaymentRepository", () => {
       expect(result.items.map((p) => p.id).sort()).toEqual(["pay_1", "pay_3"]);
     });
 
-    it("combines status and customer filters", async () => {
+    it("combines statuses and customer filters", async () => {
       const repo = await buildRepo();
-      const result = await repo.list({ status: "paid", customer: "לוי" });
+      const result = await repo.list({
+        statuses: ["paid"],
+        customer: "לוי"
+      });
       expect(result.items.map((p) => p.id)).toEqual(["pay_3"]);
     });
 

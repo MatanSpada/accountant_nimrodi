@@ -72,18 +72,28 @@ describe("parseFiltersFromQuery", () => {
     const f = parseFiltersFromQuery({});
     expect(f.sortBy).toBe("created_at");
     expect(f.sortDir).toBe("desc");
-    expect(f.status).toBeUndefined();
+    expect(f.statuses).toBeUndefined();
     expect(f.customer).toBeUndefined();
   });
 
-  it("parses valid status", () => {
+  it("parses single valid status into array", () => {
     const f = parseFiltersFromQuery({ status: "paid" });
-    expect(f.status).toBe("paid");
+    expect(f.statuses).toEqual(["paid"]);
   });
 
-  it("ignores unknown status", () => {
+  it("parses comma-separated multi-status", () => {
+    const f = parseFiltersFromQuery({ status: "paid,failed,pending" });
+    expect(f.statuses).toEqual(["paid", "failed", "pending"]);
+  });
+
+  it("filters out unknown statuses, keeps valid ones", () => {
+    const f = parseFiltersFromQuery({ status: "paid,unknown_status,failed" });
+    expect(f.statuses).toEqual(["paid", "failed"]);
+  });
+
+  it("ignores status param with only invalid values", () => {
     const f = parseFiltersFromQuery({ status: "unknown_status" });
-    expect(f.status).toBeUndefined();
+    expect(f.statuses).toBeUndefined();
   });
 
   it("parses customer name", () => {
@@ -142,8 +152,13 @@ describe("hasActiveFilters", () => {
     expect(hasActiveFilters(f)).toBe(false);
   });
 
-  it("returns true when status is set", () => {
+  it("returns true when statuses are set", () => {
     const f = parseFiltersFromQuery({ status: "paid" });
+    expect(hasActiveFilters(f)).toBe(true);
+  });
+
+  it("returns true when multiple statuses are set", () => {
+    const f = parseFiltersFromQuery({ status: "paid,failed" });
     expect(hasActiveFilters(f)).toBe(true);
   });
 
@@ -177,13 +192,31 @@ describe("buildFilterUrl", () => {
     expect(url).toBe("/admin/payments");
   });
 
-  it("includes status param", () => {
+  it("includes status param for single status", () => {
     const url = buildFilterUrl("/admin/payments", {
-      status: "paid",
+      statuses: ["paid"],
       sortBy: "created_at",
       sortDir: "desc"
     });
     expect(url).toContain("status=paid");
+  });
+
+  it("includes comma-separated status param for multiple statuses", () => {
+    const url = buildFilterUrl("/admin/payments", {
+      statuses: ["paid", "failed"],
+      sortBy: "created_at",
+      sortDir: "desc"
+    });
+    expect(url).toContain("status=paid%2Cfailed");
+  });
+
+  it("omits status param when statuses array is empty", () => {
+    const url = buildFilterUrl("/admin/payments", {
+      statuses: [],
+      sortBy: "created_at",
+      sortDir: "desc"
+    });
+    expect(url).not.toContain("status=");
   });
 
   it("includes sort param when non-default", () => {
@@ -283,12 +316,29 @@ describe("buildChips", () => {
     ).toHaveLength(0);
   });
 
-  it("generates status chip with Hebrew label and remove URL", () => {
+  it("generates one status chip per selected status", () => {
     const f = parseFiltersFromQuery({ status: "paid" });
     const chips = buildChips("/admin/payments", f, getPaymentStatusLabel);
     expect(chips).toHaveLength(1);
     expect(chips[0].label).toContain("שולם");
     expect(chips[0].removeUrl).not.toContain("status=paid");
+  });
+
+  it("generates separate chips for multiple statuses", () => {
+    const f = parseFiltersFromQuery({ status: "paid,failed" });
+    const chips = buildChips("/admin/payments", f, getPaymentStatusLabel);
+    expect(chips).toHaveLength(2);
+    const labels = chips.map((c) => c.label);
+    expect(labels.some((l) => l.includes("שולם"))).toBe(true);
+    expect(labels.some((l) => l.includes("נכשל"))).toBe(true);
+  });
+
+  it("remove URL for one status keeps the other", () => {
+    const f = parseFiltersFromQuery({ status: "paid,failed" });
+    const chips = buildChips("/admin/payments", f, getPaymentStatusLabel);
+    const paidChip = chips.find((c) => c.label.includes("שולם"));
+    expect(paidChip?.removeUrl).toContain("status=failed");
+    expect(paidChip?.removeUrl).not.toContain("status=paid");
   });
 
   it("generates customer chip", () => {
@@ -298,12 +348,12 @@ describe("buildChips", () => {
     expect(chips[0].removeUrl).not.toContain("customer=");
   });
 
-  it("generates date chips for valid dates only", () => {
+  it("generates single date range chip for valid range", () => {
     const f = parseFiltersFromQuery({ from: "01/07/26", to: "31/07/26" });
     const chips = buildChips("/admin/payments", f, getPaymentStatusLabel);
-    expect(chips).toHaveLength(2);
+    expect(chips).toHaveLength(1);
     expect(chips[0].label).toContain("01/07/26");
-    expect(chips[1].label).toContain("31/07/26");
+    expect(chips[0].label).toContain("31/07/26");
   });
 
   it("does not generate a chip for invalid (unparsed) date", () => {
@@ -313,11 +363,16 @@ describe("buildChips", () => {
     expect(chips[0].label).toContain("שולם");
   });
 
-  it("remove chip for dateFrom preserves other filters", () => {
-    const f = parseFiltersFromQuery({ from: "01/07/26", status: "paid" });
+  it("remove chip for date range clears both from and to", () => {
+    const f = parseFiltersFromQuery({
+      from: "01/07/26",
+      to: "31/07/26",
+      status: "paid"
+    });
     const chips = buildChips("/admin/payments", f, getPaymentStatusLabel);
-    const dateChip = chips.find((c) => c.label.includes("מתאריך"));
-    expect(dateChip?.removeUrl).toContain("status=paid");
-    expect(dateChip?.removeUrl).not.toContain("from=");
+    const rangeChip = chips.find((c) => c.label.includes("טווח"));
+    expect(rangeChip?.removeUrl).toContain("status=paid");
+    expect(rangeChip?.removeUrl).not.toContain("from=");
+    expect(rangeChip?.removeUrl).not.toContain("to=");
   });
 });
