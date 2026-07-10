@@ -26,6 +26,17 @@ The system currently supports:
 - Real invoice provider: not implemented yet
 - CRM integration: not implemented yet
 
+## Admin UI
+
+The admin interface (`/admin/payments`) is a Hebrew RTL Power BI-style dashboard with:
+
+- **Smart filter bar** — date range calendar picker (dd/mm/yy format), customer autocomplete (shows suggestions from first typed character), multi-select status dropdown.
+- **Client-side filter interactions** — filter results update without a full page reload. The status dropdown stays open while selecting multiple statuses; results fetch in the background. Sort headers, chip removes, and pagination also use partial page updates via `fetch()` + `DOMParser`. Falls back to full navigation if fetch fails.
+- **Active filter chips** — one chip per active filter with individual × removal. Date range shows as a single combined chip.
+- **Sortable table columns** — click column headers to sort ascending/descending; sort state persists across filter changes via URL params.
+- **Row numbers** — numbered consistently with pagination offset.
+- **URL-driven state** — all filter and sort state is stored in query params, making filtered views bookmarkable and shareable.
+
 ## Quick start
 
 ```bash

@@ -6,3 +6,4 @@ dist
 coverage
 *.tsbuildinfo
 npm-debug.log*
+docs/

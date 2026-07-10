@@ -1480,6 +1480,7 @@ const FILTER_JS = `
 (function () {
   'use strict';
 
+  // ── Date utilities ────────────────────────────────────────────────────────
   function isoToDdMmYy(iso) {
     if (!iso) return '';
     var parts = iso.split('-');
@@ -1487,6 +1488,15 @@ const FILTER_JS = `
     return parts[2] + '/' + parts[1] + '/' + parts[0].slice(2);
   }
 
+  function ddMmYyToIso(raw) {
+    var m = typeof raw === 'string' ? raw.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2})$/) : null;
+    if (!m) return '';
+    var d = m[1].length === 1 ? '0' + m[1] : m[1];
+    var mo = m[2].length === 1 ? '0' + m[2] : m[2];
+    return '20' + m[3] + '-' + mo + '-' + d;
+  }
+
+  // ── Read current filter state from the DOM ────────────────────────────────
   function getFilterState() {
     var statuses = [];
     document.querySelectorAll('.status-cb:checked').forEach(function (cb) {
@@ -1509,6 +1519,84 @@ const FILTER_JS = `
     return { sort: p.get('sort') || '', dir: p.get('dir') || '' };
   }
 
+  // ── Fetch-based partial page update ──────────────────────────────────────
+  var _activeRequest = null;
+
+  function fetchResults(url) {
+    var resultsEl = document.getElementById('payments-results');
+    if (!resultsEl) { window.location.href = url; return; }
+
+    if (_activeRequest) { try { _activeRequest.abort(); } catch (_) {} }
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    _activeRequest = controller;
+
+    resultsEl.style.opacity = '0.45';
+    resultsEl.style.pointerEvents = 'none';
+    resultsEl.style.transition = 'opacity 150ms';
+
+    fetch(url, { signal: controller ? controller.signal : undefined })
+      .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.text(); })
+      .then(function (html) {
+        _activeRequest = null;
+        var current = document.getElementById('payments-results');
+        if (!current) return;
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(html, 'text/html');
+        var newResults = doc.getElementById('payments-results');
+        if (!newResults) { window.location.href = url; return; }
+
+        // Update card title (outside payments-results)
+        var newTitle = doc.querySelector('.card-header h3');
+        var curTitle = document.querySelector('.card-header h3');
+        if (newTitle && curTitle) curTitle.textContent = newTitle.textContent;
+
+        // Sync the clear-filter link in the filter bar
+        var newClear = doc.querySelector('.filter-clear-link');
+        var curClear = document.querySelector('.filter-clear-link');
+        var filterBar = document.querySelector('.filter-bar');
+        if (filterBar) {
+          if (newClear && curClear) { curClear.replaceWith(newClear); }
+          else if (newClear && !curClear) {
+            var errDiv = filterBar.querySelector('#date-range-error');
+            if (errDiv) filterBar.insertBefore(newClear, errDiv); else filterBar.appendChild(newClear);
+          } else if (!newClear && curClear) { curClear.remove(); }
+        }
+
+        current.replaceWith(newResults);
+        syncFilterInputsFromUrl(url);
+      })
+      .catch(function (err) {
+        _activeRequest = null;
+        if (err && err.name === 'AbortError') return;
+        var el = document.getElementById('payments-results');
+        if (el) { el.style.opacity = ''; el.style.pointerEvents = ''; }
+        window.location.href = url;
+      });
+  }
+
+  // Sync filter bar inputs to match a URL (called after navigation or fetch)
+  function syncFilterInputsFromUrl(url) {
+    var qs = url.indexOf('?') !== -1 ? url.slice(url.indexOf('?') + 1) : '';
+    var params = new URLSearchParams(qs);
+
+    var statusParam = params.get('status') || '';
+    var newStatuses = statusParam ? statusParam.split(',').map(function (s) { return s.trim(); }) : [];
+    document.querySelectorAll('.status-cb').forEach(function (cb) {
+      cb.checked = newStatuses.indexOf(cb.value) !== -1;
+    });
+    updateStatusTrigger();
+
+    var customerEl = document.getElementById('filter-customer');
+    if (customerEl instanceof HTMLInputElement) customerEl.value = params.get('customer') || '';
+
+    var fromEl = document.getElementById('date-from-native');
+    var toEl = document.getElementById('date-to-native');
+    var fromIso = ddMmYyToIso(params.get('from') || '');
+    var toIso = ddMmYyToIso(params.get('to') || '');
+    if (fromEl instanceof HTMLInputElement) { fromEl.value = fromIso; updateDateDisplay(fromEl); }
+    if (toEl instanceof HTMLInputElement) { toEl.value = toIso; updateDateDisplay(toEl); }
+  }
+
   function applyFilters() {
     var state = getFilterState();
     var sort = getSortParams();
@@ -1517,7 +1605,10 @@ const FILTER_JS = `
     var applyDates = false;
     if (state.from && state.to) {
       if (state.from > state.to) {
-        if (errEl) { errEl.textContent = '\\u05EA\\u05D0\\u05E8\\u05D9\\u05DA \\u05D4\\u05E1\\u05D9\\u05D5\\u05DD \\u05D7\\u05D9\\u05D9\\u05D1 \\u05DC\\u05D4\\u05D9\\u05D5\\u05EA \\u05D0\\u05D7\\u05E8\\u05D9 \\u05EA\\u05D0\\u05E8\\u05D9\\u05DA \\u05D4\\u05D4\\u05EA\\u05D7\\u05DC\\u05D4'; errEl.hidden = false; }
+        if (errEl) {
+          errEl.textContent = '\\u05EA\\u05D0\\u05E8\\u05D9\\u05DA \\u05D4\\u05E1\\u05D9\\u05D5\\u05DD \\u05D7\\u05D9\\u05D9\\u05D1 \\u05DC\\u05D4\\u05D9\\u05D5\\u05EA \\u05D0\\u05D7\\u05E8\\u05D9 \\u05EA\\u05D0\\u05E8\\u05D9\\u05DA \\u05D4\\u05D4\\u05EA\\u05D7\\u05DC\\u05D4';
+          errEl.hidden = false;
+        }
         return;
       }
       if (errEl) errEl.hidden = true;
@@ -1536,8 +1627,26 @@ const FILTER_JS = `
     if (sort.sort) params.set('sort', sort.sort);
     if (sort.dir) params.set('dir', sort.dir);
     var qs = params.toString();
-    window.location.href = '/admin/payments' + (qs ? '?' + qs : '');
+    var url = '/admin/payments' + (qs ? '?' + qs : '');
+    history.pushState(null, '', url);
+    fetchResults(url);
   }
+
+  // Handle browser back/forward navigation
+  window.addEventListener('popstate', function () { fetchResults(window.location.href); });
+
+  // Intercept all /admin/payments list links for smooth partial updates
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+    var link = t.closest('a[href]');
+    if (!(link instanceof HTMLAnchorElement)) return;
+    var href = link.getAttribute('href') || '';
+    if (href !== '/admin/payments' && href.indexOf('/admin/payments?') !== 0) return;
+    e.preventDefault();
+    history.pushState(null, '', href);
+    fetchResults(href);
+  });
 
   // ── Status dropdown ──────────────────────────────────────────────────────
   function updateStatusTrigger() {
@@ -2634,37 +2743,39 @@ export function renderPaymentsListPage(input: {
           </div>
         </div>
         ${renderFilterBar(input.filters, input.customerNames)}
-        ${renderFilterChips(input.filters)}
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>מס'</th>
-              ${renderSortTh("תאריך", "created_at", input.filters)}
-              ${renderSortTh("לקוח", "customer_name", input.filters)}
-              <th>פרטי קשר</th>
-              ${renderSortTh("סכום", "amount_agorot", input.filters)}
-              ${renderSortTh("סטטוס", "status", input.filters)}
-              <th>מסמך</th>
-              <th>קישור</th>
-            </tr>
-          </thead>
-          <tbody>${renderPaymentRows(
-            input.payments.items.map((payment) => ({
-              payment,
-              invoice: input.invoiceByPaymentId[payment.id] ?? null
-            })),
-            input.payments.offset
-          )}</tbody>
-        </table>
-        ${
-          input.payments.offset > 0 || input.payments.hasMore
-            ? `
-          <div class="pagination">
-            ${input.payments.offset > 0 ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(prevUrl)}">עמוד קודם</a>` : ""}
-            ${input.payments.hasMore ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(nextUrl)}">עמוד הבא</a>` : ""}
-          </div>`
-            : ""
-        }
+        <div id="payments-results">
+          ${renderFilterChips(input.filters)}
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>מס'</th>
+                ${renderSortTh("תאריך", "created_at", input.filters)}
+                ${renderSortTh("לקוח", "customer_name", input.filters)}
+                <th>פרטי קשר</th>
+                ${renderSortTh("סכום", "amount_agorot", input.filters)}
+                ${renderSortTh("סטטוס", "status", input.filters)}
+                <th>מסמך</th>
+                <th>קישור</th>
+              </tr>
+            </thead>
+            <tbody>${renderPaymentRows(
+              input.payments.items.map((payment) => ({
+                payment,
+                invoice: input.invoiceByPaymentId[payment.id] ?? null
+              })),
+              input.payments.offset
+            )}</tbody>
+          </table>
+          ${
+            input.payments.offset > 0 || input.payments.hasMore
+              ? `
+            <div class="pagination">
+              ${input.payments.offset > 0 ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(prevUrl)}">עמוד קודם</a>` : ""}
+              ${input.payments.hasMore ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(nextUrl)}">עמוד הבא</a>` : ""}
+            </div>`
+              : ""
+          }
+        </div>
       </div>
       <script>${FILTER_JS}</script>
     `
