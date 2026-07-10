@@ -348,6 +348,21 @@ describe("buildChips", () => {
     expect(chips[0].removeUrl).not.toContain("customer=");
   });
 
+  it("customer chip remove URL preserves status and sort filters", () => {
+    const f = parseFiltersFromQuery({
+      customer: "ישראל",
+      status: "paid",
+      sort: "amount_agorot",
+      dir: "asc"
+    });
+    const chips = buildChips("/admin/payments", f, getPaymentStatusLabel);
+    const customerChip = chips.find((c) => c.label.includes("ישראל"));
+    expect(customerChip).toBeDefined();
+    expect(customerChip!.removeUrl).toContain("status=paid");
+    expect(customerChip!.removeUrl).toContain("sort=amount_agorot");
+    expect(customerChip!.removeUrl).not.toContain("customer=");
+  });
+
   it("generates single date range chip for valid range", () => {
     const f = parseFiltersFromQuery({ from: "01/07/26", to: "31/07/26" });
     const chips = buildChips("/admin/payments", f, getPaymentStatusLabel);

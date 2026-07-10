@@ -1764,6 +1764,7 @@ const FILTER_JS = `
     var field = document.getElementById('filter-customer');
     if (!field) return;
     var blurTimer = null;
+    var applyTimer = null;
     var panel = document.getElementById('customer-autocomplete-panel');
     var dataEl = document.getElementById('customer-autocomplete-data');
     var customerNames = [];
@@ -1823,6 +1824,7 @@ const FILTER_JS = `
     }
 
     function applyCustomerValue(value) {
+      clearTimeout(applyTimer);
       field.value = value;
       closePanel();
       clearTimeout(blurTimer);
@@ -1848,6 +1850,7 @@ const FILTER_JS = `
       if (e.key === 'Enter') {
         e.preventDefault();
         clearTimeout(blurTimer);
+        clearTimeout(applyTimer);
         if (activeIndex >= 0 && visibleSuggestions[activeIndex]) {
           applyCustomerValue(visibleSuggestions[activeIndex]);
           return;
@@ -1859,6 +1862,7 @@ const FILTER_JS = `
 
       if (e.key === 'Escape') {
         clearTimeout(blurTimer);
+        clearTimeout(applyTimer);
         closePanel();
         return;
       }
@@ -1878,6 +1882,7 @@ const FILTER_JS = `
     });
 
     field.addEventListener('blur', function () {
+      clearTimeout(applyTimer);
       blurTimer = setTimeout(function () {
         closePanel();
         applyFilters();
@@ -1895,7 +1900,9 @@ const FILTER_JS = `
 
     field.addEventListener('input', function () {
       clearTimeout(blurTimer);
+      clearTimeout(applyTimer);
       updateSuggestions();
+      applyTimer = setTimeout(applyFilters, 400);
     });
 
     panel.addEventListener('mousedown', function (e) {

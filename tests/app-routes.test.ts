@@ -622,4 +622,75 @@ describe("app routes", () => {
     expect(mockInvoicePage.status).toBe(200);
     expect(await mockInvoicePage.text()).toContain("מסמך דמו");
   });
+
+  it("filters payments by customer name and renders matching rows", async () => {
+    const { app } = createTestApp({ enableDevTools: false });
+    const session = await login(app, "test-admin-password");
+
+    // Create two payments with distinct customer names
+    await app.request("/api/payments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
+      },
+      body: JSON.stringify({
+        customer_name: "ישראל ישראלי",
+        amount_shekel: "100.00",
+        description: "תשלום ישראל"
+      })
+    });
+    await app.request("/api/payments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
+      },
+      body: JSON.stringify({
+        customer_name: "מתן ספדה",
+        amount_shekel: "200.00",
+        description: "תשלום מתן"
+      })
+    });
+
+    // Filter by partial Hebrew customer name
+    const filteredPage = await app.request("/admin/payments?customer=ישראל", {
+      headers: { cookie: session.cookie ?? "" }
+    });
+    expect(filteredPage.status).toBe(200);
+    const html = await filteredPage.text();
+
+    // Should contain the matching customer row
+    expect(html).toContain("ישראל ישראלי");
+    // Should NOT contain the other customer in the results area
+    // (it may appear in autocomplete JSON, so check the results div)
+    const resultsStart = html.indexOf('id="payments-results"');
+    const resultsEnd = html.indexOf("</table>", resultsStart);
+    const resultsHtml = html.slice(resultsStart, resultsEnd);
+    expect(resultsHtml).toContain("ישראל ישראלי");
+    expect(resultsHtml).not.toContain("מתן ספדה");
+
+    // Customer chip should render
+    expect(html).toContain("לקוח: ישראל");
+
+    // Removing customer chip should go to URL without customer param
+    const chipRemoveMatch = html.match(/לקוח:.*?href="([^"]+)"/s);
+    expect(chipRemoveMatch).not.toBeNull();
+    expect(chipRemoveMatch![1]).not.toContain("customer=");
+  });
+
+  it("customer filter preserves status and sort filters in page links", async () => {
+    const { app } = createTestApp({ enableDevTools: false });
+    const session = await login(app, "test-admin-password");
+
+    const filteredPage = await app.request(
+      "/admin/payments?customer=ישראל&status=paid&sort=amount_agorot&dir=asc",
+      { headers: { cookie: session.cookie ?? "" } }
+    );
+    expect(filteredPage.status).toBe(200);
+    const html = await filteredPage.text();
+    // Sort links and chips must contain customer param (URL-encoded Hebrew)
+    expect(html).toContain("customer=");
+    expect(html).toContain("status=paid");
+  });
 });
