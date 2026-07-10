@@ -1337,6 +1337,7 @@ const CSS = `
     opacity: 0;
     cursor: pointer;
     z-index: 1;
+    pointer-events: none;
   }
 
   /* ── Customer autocomplete ── */
@@ -1674,24 +1675,17 @@ const FILTER_JS = `
     var trigger = document.getElementById('status-trigger');
     var panel = document.getElementById('status-panel');
     if (!wrap || !trigger || !panel) return;
-    var hasPendingChanges = false;
 
-    function closePanel(options) {
-      var shouldApply = options && options.applyChanges;
+    function closePanel() {
       if (panel.hidden) return;
       panel.hidden = true;
       trigger.setAttribute('aria-expanded', 'false');
-      if (shouldApply && hasPendingChanges) {
-        hasPendingChanges = false;
-        applyFilters();
-      }
     }
 
     trigger.addEventListener('click', function (e) {
       e.stopPropagation();
-      var open = !panel.hidden;
-      if (open) {
-        closePanel({ applyChanges: true });
+      if (!panel.hidden) {
+        closePanel();
       } else {
         panel.hidden = false;
         trigger.setAttribute('aria-expanded', 'true');
@@ -1700,21 +1694,21 @@ const FILTER_JS = `
 
     document.addEventListener('click', function (e) {
       if (!wrap.contains(e.target)) {
-        closePanel({ applyChanges: true });
+        closePanel();
       }
     });
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && !panel.hidden) {
-        closePanel({ applyChanges: true });
+        closePanel();
         trigger.focus();
       }
     });
 
     document.querySelectorAll('.status-cb').forEach(function (cb) {
       cb.addEventListener('change', function () {
-        hasPendingChanges = true;
         updateStatusTrigger();
+        applyFilters();
       });
     });
 
@@ -1743,18 +1737,8 @@ const FILTER_JS = `
 
     document.querySelectorAll('.date-picker-wrap').forEach(function (wrap) {
       var nativeInput = wrap.querySelector('.date-native');
-      var displayButton = wrap.querySelector('.date-display-btn');
       if (!(nativeInput instanceof HTMLInputElement)) return;
-
-      if (displayButton instanceof HTMLElement) {
-        displayButton.addEventListener('click', function (event) {
-          event.preventDefault();
-          openDatePicker(nativeInput);
-        });
-      }
-
-      wrap.addEventListener('click', function (event) {
-        if (event.target === nativeInput) return;
+      wrap.addEventListener('click', function () {
         openDatePicker(nativeInput);
       });
     });
