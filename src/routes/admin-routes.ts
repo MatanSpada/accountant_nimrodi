@@ -41,9 +41,9 @@ export function registerAdminRoutes(
         container.invoiceService.getInvoiceByPaymentId(payment.id)
       )
     );
-    const pendingStatuses = new Set<
+    const waitingForPaymentStatuses = new Set<
       DashboardMetrics["statusBreakdown"][number]["status"]
-    >(["draft", "payment_created", "pending"]);
+    >(["payment_created"]);
     const statusBreakdownItems = [
       { status: "paid", label: "שולמו" },
       { status: "pending", label: "ממתינים" },
@@ -69,13 +69,13 @@ export function registerAdminRoutes(
         (payment) => payment.status === "paid"
       ).length,
       pendingCount: allPayments.items.filter((payment) =>
-        pendingStatuses.has(payment.status)
+        waitingForPaymentStatuses.has(payment.status)
       ).length,
       paidAmountAgorot: allPayments.items
         .filter((payment) => payment.status === "paid")
         .reduce((total, payment) => total + payment.amountAgorot, 0),
       pendingAmountAgorot: allPayments.items
-        .filter((payment) => pendingStatuses.has(payment.status))
+        .filter((payment) => waitingForPaymentStatuses.has(payment.status))
         .reduce((total, payment) => total + payment.amountAgorot, 0),
       statusBreakdown
     };

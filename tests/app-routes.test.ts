@@ -507,7 +507,9 @@ describe("app routes", () => {
       headers: { cookie: session.cookie ?? "" }
     });
     expect(dashboard.status).toBe(200);
-    expect(await dashboard.text()).toContain("סביבת הדגמה");
+    const dashboardHtml = await dashboard.text();
+    expect(dashboardHtml).toContain("סביבת הדגמה");
+    expect(dashboardHtml).toContain("/admin/payments?status=payment_created");
 
     const newPaymentPage = await app.request("/admin/payments/new", {
       headers: { cookie: session.cookie ?? "" }
@@ -518,7 +520,9 @@ describe("app routes", () => {
       headers: { cookie: session.cookie ?? "" }
     });
     expect(paymentsPage.status).toBe(200);
-    expect(await paymentsPage.text()).toContain("עסקאות");
+    const paymentsHtml = await paymentsPage.text();
+    expect(paymentsHtml).toContain("עסקאות");
+    expect(paymentsHtml).toContain("<th>מס'</th>");
 
     const detailPage = await app.request(
       `/admin/payments/${createPayload.payment.id}`,

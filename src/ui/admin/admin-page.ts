@@ -538,6 +538,12 @@ const CSS = `
   .cell-primary { font-weight: 600; color: var(--ink); }
   .cell-secondary { color: var(--ink-faint); font-size: 0.8rem; margin-top: 2px; }
   .amount-strong { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .row-number {
+    color: var(--ink-faint);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
 
   /* ── Status badges ── */
   .badge {
@@ -1295,11 +1301,12 @@ const CSS = `
   .status-opt input[type="checkbox"] { cursor: pointer; flex-shrink: 0; accent-color: var(--accent); }
 
   /* ── Date picker overlay ── */
-  .date-picker-wrap { position: relative; display: inline-flex; }
+  .date-picker-wrap { position: relative; display: inline-flex; width: 118px; }
 
   .date-display-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: space-between;
     gap: 6px;
     height: 34px;
     padding: 0 10px;
@@ -1309,7 +1316,7 @@ const CSS = `
     cursor: pointer;
     font-size: 0.85rem;
     color: var(--ink);
-    width: 118px;
+    width: 100%;
     transition: border-color 150ms;
     user-select: none;
     white-space: nowrap;
@@ -1330,6 +1337,51 @@ const CSS = `
     opacity: 0;
     cursor: pointer;
     z-index: 1;
+  }
+
+  /* ── Customer autocomplete ── */
+  .autocomplete-wrap {
+    position: relative;
+  }
+
+  .autocomplete-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    left: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+    z-index: 220;
+    padding: 4px;
+  }
+
+  .autocomplete-item {
+    display: block;
+    width: 100%;
+    border: none;
+    background: transparent;
+    text-align: right;
+    color: var(--ink);
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  .autocomplete-item:hover,
+  .autocomplete-item.active {
+    background: var(--surface-soft);
+  }
+
+  .autocomplete-empty {
+    padding: 8px 10px;
+    color: var(--ink-faint);
+    font-size: 0.8rem;
   }
 
   /* ── Date range error ── */
@@ -1513,33 +1565,47 @@ const FILTER_JS = `
     var trigger = document.getElementById('status-trigger');
     var panel = document.getElementById('status-panel');
     if (!wrap || !trigger || !panel) return;
+    var hasPendingChanges = false;
+
+    function closePanel(options) {
+      var shouldApply = options && options.applyChanges;
+      if (panel.hidden) return;
+      panel.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      if (shouldApply && hasPendingChanges) {
+        hasPendingChanges = false;
+        applyFilters();
+      }
+    }
 
     trigger.addEventListener('click', function (e) {
       e.stopPropagation();
       var open = !panel.hidden;
-      panel.hidden = open;
-      trigger.setAttribute('aria-expanded', String(!open));
+      if (open) {
+        closePanel({ applyChanges: true });
+      } else {
+        panel.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+      }
     });
 
     document.addEventListener('click', function (e) {
       if (!wrap.contains(e.target)) {
-        panel.hidden = true;
-        trigger.setAttribute('aria-expanded', 'false');
+        closePanel({ applyChanges: true });
       }
     });
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && !panel.hidden) {
-        panel.hidden = true;
-        trigger.setAttribute('aria-expanded', 'false');
+        closePanel({ applyChanges: true });
         trigger.focus();
       }
     });
 
     document.querySelectorAll('.status-cb').forEach(function (cb) {
       cb.addEventListener('change', function () {
+        hasPendingChanges = true;
         updateStatusTrigger();
-        applyFilters();
       });
     });
 
@@ -1554,6 +1620,36 @@ const FILTER_JS = `
   }
 
   function initDatePickers() {
+    function openDatePicker(input) {
+      if (!(input instanceof HTMLInputElement)) return;
+      input.focus();
+      if (typeof input.showPicker === 'function') {
+        try {
+          input.showPicker();
+          return;
+        } catch (_) {}
+      }
+      input.click();
+    }
+
+    document.querySelectorAll('.date-picker-wrap').forEach(function (wrap) {
+      var nativeInput = wrap.querySelector('.date-native');
+      var displayButton = wrap.querySelector('.date-display-btn');
+      if (!(nativeInput instanceof HTMLInputElement)) return;
+
+      if (displayButton instanceof HTMLElement) {
+        displayButton.addEventListener('click', function (event) {
+          event.preventDefault();
+          openDatePicker(nativeInput);
+        });
+      }
+
+      wrap.addEventListener('click', function (event) {
+        if (event.target === nativeInput) return;
+        openDatePicker(nativeInput);
+      });
+    });
+
     document.querySelectorAll('.date-native').forEach(function (input) {
       updateDateDisplay(input);
       input.addEventListener('change', function () {
@@ -1575,32 +1671,157 @@ const FILTER_JS = `
     var field = document.getElementById('filter-customer');
     if (!field) return;
     var blurTimer = null;
+    var panel = document.getElementById('customer-autocomplete-panel');
+    var dataEl = document.getElementById('customer-autocomplete-data');
+    var customerNames = [];
+    var activeIndex = -1;
+    var visibleSuggestions = [];
+    if (!(panel instanceof HTMLElement) || !(dataEl instanceof HTMLScriptElement)) return;
+
+    try {
+      var parsed = JSON.parse(dataEl.textContent || '[]');
+      if (Array.isArray(parsed)) {
+        customerNames = parsed.filter(function (value) {
+          return typeof value === 'string' && value.trim().length > 0;
+        });
+      }
+    } catch (_) {
+      customerNames = [];
+    }
+
+    function closePanel() {
+      panel.hidden = true;
+      panel.innerHTML = '';
+      activeIndex = -1;
+      visibleSuggestions = [];
+    }
+
+    function escapeHtmlText(value) {
+      return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderSuggestions(matches) {
+      visibleSuggestions = matches;
+      activeIndex = -1;
+      if (matches.length === 0) {
+        panel.innerHTML = '<div class="autocomplete-empty">לא נמצאו לקוחות מתאימים</div>';
+        panel.hidden = false;
+        return;
+      }
+
+      panel.innerHTML = matches
+        .map(function (name, index) {
+          return '<button type="button" class="autocomplete-item" data-customer-suggestion="' + String(index) + '">' + escapeHtmlText(name) + '</button>';
+        })
+        .join('');
+      panel.hidden = false;
+    }
+
+    function updateActiveSuggestion() {
+      var items = panel.querySelectorAll('.autocomplete-item');
+      items.forEach(function (item, index) {
+        if (!(item instanceof HTMLElement)) return;
+        item.classList.toggle('active', index === activeIndex);
+      });
+    }
+
+    function applyCustomerValue(value) {
+      field.value = value;
+      closePanel();
+      clearTimeout(blurTimer);
+      applyFilters();
+    }
+
+    function updateSuggestions() {
+      var query = field.value.trim();
+      if (!query) {
+        closePanel();
+        return;
+      }
+      var normalizedQuery = query.toLocaleLowerCase();
+      var matches = customerNames
+        .filter(function (name) {
+          return name.toLocaleLowerCase().indexOf(normalizedQuery) !== -1;
+        })
+        .slice(0, 8);
+      renderSuggestions(matches);
+    }
 
     field.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
         e.preventDefault();
         clearTimeout(blurTimer);
+        if (activeIndex >= 0 && visibleSuggestions[activeIndex]) {
+          applyCustomerValue(visibleSuggestions[activeIndex]);
+          return;
+        }
+        closePanel();
         applyFilters();
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        clearTimeout(blurTimer);
+        closePanel();
+        return;
+      }
+
+      if (e.key === 'ArrowDown' && !panel.hidden && visibleSuggestions.length > 0) {
+        e.preventDefault();
+        activeIndex = Math.min(activeIndex + 1, visibleSuggestions.length - 1);
+        updateActiveSuggestion();
+        return;
+      }
+
+      if (e.key === 'ArrowUp' && !panel.hidden && visibleSuggestions.length > 0) {
+        e.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        updateActiveSuggestion();
       }
     });
 
     field.addEventListener('blur', function () {
-      blurTimer = setTimeout(applyFilters, 200);
+      blurTimer = setTimeout(function () {
+        closePanel();
+        applyFilters();
+      }, 150);
     });
 
     field.addEventListener('focus', function () {
       clearTimeout(blurTimer);
+      if (field.value.trim()) {
+        updateSuggestions();
+      } else {
+        closePanel();
+      }
     });
 
-    field.addEventListener('input', function (e) {
-      var list = document.getElementById('customer-autocomplete');
-      if (!list) return;
-      var opts = [];
-      list.querySelectorAll('option').forEach(function (o) { opts.push(o.value); });
-      if (opts.indexOf(e.target.value) !== -1) {
-        clearTimeout(blurTimer);
-        applyFilters();
+    field.addEventListener('input', function () {
+      clearTimeout(blurTimer);
+      updateSuggestions();
+    });
+
+    panel.addEventListener('mousedown', function (e) {
+      var target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      var suggestion = target.closest('[data-customer-suggestion]');
+      if (!(suggestion instanceof HTMLElement)) return;
+      e.preventDefault();
+      var index = Number(suggestion.getAttribute('data-customer-suggestion'));
+      if (Number.isFinite(index) && visibleSuggestions[index]) {
+        applyCustomerValue(visibleSuggestions[index]);
       }
+    });
+
+    document.addEventListener('click', function (e) {
+      var target = e.target;
+      if (!(target instanceof Node)) return;
+      if (target === field || panel.contains(target)) return;
+      closePanel();
     });
   }
 
@@ -1624,6 +1845,10 @@ function renderFilterBar(
     sortDir: filters.sortDir
   });
   const selectedStatuses = filters.statuses ?? [];
+  const customerNamesJson = JSON.stringify(customerNames).replace(
+    /</g,
+    "\\u003c"
+  );
   const calIcon = `<svg class="cal-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/><line x1="1.5" y1="6.5" x2="14.5" y2="6.5"/></svg>`;
 
   return `
@@ -1656,14 +1881,14 @@ function renderFilterBar(
       </div>
       <div class="filter-field">
         <span class="filter-field-label">לקוח</span>
-        <input class="filter-input filter-input-wide" type="text" id="filter-customer"
-          value="${escapeHtml(filters.customer ?? "")}"
-          placeholder="שם לקוח"
-          list="customer-autocomplete"
-          autocomplete="off" />
-        <datalist id="customer-autocomplete">
-          ${customerNames.map((n) => `<option value="${escapeHtml(n)}"></option>`).join("")}
-        </datalist>
+        <div class="autocomplete-wrap">
+          <input class="filter-input filter-input-wide" type="text" id="filter-customer"
+            value="${escapeHtml(filters.customer ?? "")}"
+            placeholder="שם לקוח"
+            autocomplete="off" />
+          <div class="autocomplete-panel" id="customer-autocomplete-panel" hidden></div>
+          <script type="application/json" id="customer-autocomplete-data">${customerNamesJson}</script>
+        </div>
       </div>
       <div class="filter-field">
         <span class="filter-field-label">סטטוס</span>
@@ -2060,15 +2285,16 @@ function renderDashboardRows(items: PaymentListItemView[]) {
     .join("");
 }
 
-function renderPaymentRows(items: PaymentListItemView[]) {
+function renderPaymentRows(items: PaymentListItemView[], offset: number) {
   if (items.length === 0) {
-    return `<tr><td colspan="7"><div class="empty">עדיין לא נוצרו בקשות תשלום.</div></td></tr>`;
+    return `<tr><td colspan="8"><div class="empty">עדיין לא נוצרו בקשות תשלום.</div></td></tr>`;
   }
 
   return items
     .map(
-      ({ payment, invoice }) => `
+      ({ payment, invoice }, index) => `
     <tr onclick="window.location='/admin/payments/${payment.id}'">
+      <td class="row-number">${offset + index + 1}</td>
       <td style="color:var(--ink-faint);font-size:0.8rem;white-space:nowrap;">${formatDateTime(payment.createdAt)}</td>
       <td>
         <div class="cell-primary">${escapeHtml(payment.customerName)}</div>
@@ -2224,10 +2450,10 @@ export function renderDashboardPage(input: {
           <span class="kpi-value success">${input.metrics.paidCount}</span>
           <span class="kpi-sub">עסקאות שאושרו</span>
         </a>
-        <a class="kpi-card" href="${BASE_PATH}">
+        <a class="kpi-card" href="${BASE_PATH}?status=payment_created">
           <span class="kpi-label">ממתינות</span>
           <span class="kpi-value">${input.metrics.pendingCount}</span>
-          <span class="kpi-sub">פתוחות לתשלום</span>
+          <span class="kpi-sub">קישורים פתוחים לתשלום</span>
         </a>
         <div class="kpi-card">
           <span class="kpi-label">סכום שנגבה</span>
@@ -2412,6 +2638,7 @@ export function renderPaymentsListPage(input: {
         <table class="data-table">
           <thead>
             <tr>
+              <th>מס'</th>
               ${renderSortTh("תאריך", "created_at", input.filters)}
               ${renderSortTh("לקוח", "customer_name", input.filters)}
               <th>פרטי קשר</th>
@@ -2425,7 +2652,8 @@ export function renderPaymentsListPage(input: {
             input.payments.items.map((payment) => ({
               payment,
               invoice: input.invoiceByPaymentId[payment.id] ?? null
-            }))
+            })),
+            input.payments.offset
           )}</tbody>
         </table>
         ${
