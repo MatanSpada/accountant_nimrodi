@@ -84,29 +84,29 @@ const APP_VERSION = "גרסת בטא";
 
 const CSS = `
   :root {
-    --bg: #f0f2f5;
+    --bg: #F3EFE8;
     --surface: #ffffff;
-    --surface-soft: #f7f8fa;
-    --surface-muted: #eef0f4;
-    --ink: #0d1b2a;
+    --surface-soft: #F5F1EA;
+    --surface-muted: #EDE8DF;
+    --ink: #243041;
     --ink-soft: #4a5568;
     --ink-faint: #8896a8;
-    --line: #e2e8f0;
-    --line-strong: #cbd5e1;
+    --line: #DDD6CC;
+    --line-strong: #C9C0B5;
     --brand: #1e3a5f;
-    --brand-light: #2c5282;
-    --brand-soft: #e8eef6;
-    --accent: #2563eb;
-    --accent-soft: #dbeafe;
+    --brand-light: #2F5D8A;
+    --brand-soft: #E4EDF6;
+    --accent: #315A8C;
+    --accent-soft: #D8E4F0;
     --success: #15803d;
     --success-soft: #dcfce7;
     --warning: #b45309;
     --warning-soft: #fef3c7;
     --danger: #b91c1c;
     --danger-soft: #fee2e2;
-    --shadow-xs: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-sm: 0 4px 12px rgba(0,0,0,0.06);
-    --shadow-md: 0 8px 24px rgba(0,0,0,0.08);
+    --shadow-xs: 0 1px 3px rgba(18,12,6,0.07), 0 1px 2px rgba(18,12,6,0.05);
+    --shadow-sm: 0 4px 12px rgba(18,12,6,0.07);
+    --shadow-md: 0 8px 24px rgba(18,12,6,0.09);
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
@@ -147,7 +147,7 @@ const CSS = `
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    background: #111827;
+    background: #1A1814;
     color: #e5e7eb;
     padding: 0;
   }
@@ -211,8 +211,8 @@ const CSS = `
   }
 
   .nav-link.active {
-    background: rgba(37,99,235,0.18);
-    color: #93c5fd;
+    background: rgba(49,90,140,0.2);
+    color: #8BBAD4;
   }
 
   .nav-link.active::before {
@@ -223,7 +223,7 @@ const CSS = `
     bottom: 6px;
     width: 3px;
     border-radius: 3px 0 0 3px;
-    background: #3b82f6;
+    background: #4B82B5;
   }
 
   .nav-icon {
@@ -615,13 +615,13 @@ const CSS = `
   .btn-primary {
     background: var(--accent);
     color: #fff;
-    box-shadow: 0 2px 6px rgba(37,99,235,0.25);
+    box-shadow: 0 2px 6px rgba(49,90,140,0.25);
   }
 
   .btn-primary:hover {
-    background: #1d4ed8;
+    background: #264870;
     color: #fff;
-    box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+    box-shadow: 0 4px 12px rgba(49,90,140,0.3);
     transform: translateY(-1px);
   }
 
@@ -723,7 +723,7 @@ const CSS = `
   input:focus, textarea:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    box-shadow: 0 0 0 3px rgba(49,90,140,0.12);
   }
 
   textarea { min-height: 110px; resize: vertical; }
@@ -1072,7 +1072,7 @@ const CSS = `
 
   a.kpi-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(37,99,235,0.28);
+    border-color: rgba(49,90,140,0.28);
     box-shadow: var(--shadow-sm);
   }
 
@@ -1135,7 +1135,7 @@ const CSS = `
   .filter-input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(37,99,235,0.08);
+    box-shadow: 0 0 0 2px rgba(49,90,140,0.08);
   }
 
   .filter-input-wide { width: 170px; }
@@ -1186,10 +1186,10 @@ const CSS = `
     gap: 5px;
     padding: 4px 8px 4px 6px;
     background: var(--accent-soft);
-    border: 1px solid rgba(37,99,235,0.2);
+    border: 1px solid rgba(49,90,140,0.2);
     border-radius: 999px;
     font-size: 0.78rem;
-    color: #1d4ed8;
+    color: #264870;
     font-weight: 500;
     white-space: nowrap;
   }
@@ -1201,15 +1201,15 @@ const CSS = `
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: rgba(37,99,235,0.14);
-    color: #1d4ed8;
+    background: rgba(49,90,140,0.14);
+    color: #264870;
     font-size: 0.7rem;
     text-decoration: none;
     flex-shrink: 0;
     transition: background 120ms;
   }
 
-  .chip-x:hover { background: rgba(37,99,235,0.28); color: #1d4ed8; }
+  .chip-x:hover { background: rgba(49,90,140,0.28); color: #264870; }
 
   .chips-clear {
     font-size: 0.78rem;
@@ -1265,8 +1265,8 @@ const CSS = `
   }
 
   .status-trigger:hover { border-color: var(--accent); }
-  .status-trigger:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.08); }
-  .status-trigger.has-selection { border-color: var(--accent); background: var(--accent-soft); color: #1d4ed8; }
+  .status-trigger:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(49,90,140,0.08); }
+  .status-trigger.has-selection { border-color: var(--accent); background: var(--accent-soft); color: #264870; }
 
   .status-trigger-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
   .status-trigger-chevron { font-size: 0.6rem; opacity: 0.55; flex-shrink: 0; }
