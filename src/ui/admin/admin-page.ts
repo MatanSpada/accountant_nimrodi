@@ -1340,51 +1340,6 @@ const CSS = `
     pointer-events: none;
   }
 
-  /* ── Customer autocomplete ── */
-  .autocomplete-wrap {
-    position: relative;
-  }
-
-  .autocomplete-panel {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    left: 0;
-    max-height: 240px;
-    overflow-y: auto;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-sm);
-    box-shadow: var(--shadow-sm);
-    z-index: 220;
-    padding: 4px;
-  }
-
-  .autocomplete-item {
-    display: block;
-    width: 100%;
-    border: none;
-    background: transparent;
-    text-align: right;
-    color: var(--ink);
-    padding: 8px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    line-height: 1.4;
-  }
-
-  .autocomplete-item:hover,
-  .autocomplete-item.active {
-    background: var(--surface-soft);
-  }
-
-  .autocomplete-empty {
-    padding: 8px 10px;
-    color: var(--ink-faint);
-    font-size: 0.8rem;
-  }
-
   /* ── Date range error ── */
   .date-range-error {
     font-size: 0.72rem;
@@ -1762,166 +1717,30 @@ const FILTER_JS = `
   // ── Customer field ────────────────────────────────────────────────────────
   function initCustomerField() {
     var field = document.getElementById('filter-customer');
-    if (!field) return;
+    if (!(field instanceof HTMLInputElement)) return;
     var blurTimer = null;
     var applyTimer = null;
-    var panel = document.getElementById('customer-autocomplete-panel');
-    var dataEl = document.getElementById('customer-autocomplete-data');
-    var customerNames = [];
-    var activeIndex = -1;
-    var visibleSuggestions = [];
-    if (!(panel instanceof HTMLElement) || !(dataEl instanceof HTMLScriptElement)) return;
-
-    try {
-      var parsed = JSON.parse(dataEl.textContent || '[]');
-      if (Array.isArray(parsed)) {
-        customerNames = parsed.filter(function (value) {
-          return typeof value === 'string' && value.trim().length > 0;
-        });
-      }
-    } catch (_) {
-      customerNames = [];
-    }
-
-    function closePanel() {
-      panel.hidden = true;
-      panel.innerHTML = '';
-      activeIndex = -1;
-      visibleSuggestions = [];
-    }
-
-    function escapeHtmlText(value) {
-      return value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    function renderSuggestions(matches) {
-      visibleSuggestions = matches;
-      activeIndex = -1;
-      if (matches.length === 0) {
-        panel.innerHTML = '<div class="autocomplete-empty">לא נמצאו לקוחות מתאימים</div>';
-        panel.hidden = false;
-        return;
-      }
-
-      panel.innerHTML = matches
-        .map(function (name, index) {
-          return '<button type="button" class="autocomplete-item" data-customer-suggestion="' + String(index) + '">' + escapeHtmlText(name) + '</button>';
-        })
-        .join('');
-      panel.hidden = false;
-    }
-
-    function updateActiveSuggestion() {
-      var items = panel.querySelectorAll('.autocomplete-item');
-      items.forEach(function (item, index) {
-        if (!(item instanceof HTMLElement)) return;
-        item.classList.toggle('active', index === activeIndex);
-      });
-    }
-
-    function applyCustomerValue(value) {
-      clearTimeout(applyTimer);
-      field.value = value;
-      closePanel();
-      clearTimeout(blurTimer);
-      applyFilters();
-    }
-
-    function updateSuggestions() {
-      var query = field.value.trim();
-      if (!query) {
-        closePanel();
-        return;
-      }
-      var normalizedQuery = query.toLocaleLowerCase();
-      var matches = customerNames
-        .filter(function (name) {
-          return name.toLocaleLowerCase().indexOf(normalizedQuery) !== -1;
-        })
-        .slice(0, 8);
-      renderSuggestions(matches);
-    }
 
     field.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
         e.preventDefault();
         clearTimeout(blurTimer);
         clearTimeout(applyTimer);
-        if (activeIndex >= 0 && visibleSuggestions[activeIndex]) {
-          applyCustomerValue(visibleSuggestions[activeIndex]);
-          return;
-        }
-        closePanel();
         applyFilters();
-        return;
-      }
-
-      if (e.key === 'Escape') {
-        clearTimeout(blurTimer);
-        clearTimeout(applyTimer);
-        closePanel();
-        return;
-      }
-
-      if (e.key === 'ArrowDown' && !panel.hidden && visibleSuggestions.length > 0) {
-        e.preventDefault();
-        activeIndex = Math.min(activeIndex + 1, visibleSuggestions.length - 1);
-        updateActiveSuggestion();
-        return;
-      }
-
-      if (e.key === 'ArrowUp' && !panel.hidden && visibleSuggestions.length > 0) {
-        e.preventDefault();
-        activeIndex = Math.max(activeIndex - 1, 0);
-        updateActiveSuggestion();
       }
     });
 
     field.addEventListener('blur', function () {
       clearTimeout(applyTimer);
       blurTimer = setTimeout(function () {
-        closePanel();
         applyFilters();
       }, 150);
-    });
-
-    field.addEventListener('focus', function () {
-      clearTimeout(blurTimer);
-      if (field.value.trim()) {
-        updateSuggestions();
-      } else {
-        closePanel();
-      }
     });
 
     field.addEventListener('input', function () {
       clearTimeout(blurTimer);
       clearTimeout(applyTimer);
-      updateSuggestions();
       applyTimer = setTimeout(applyFilters, 400);
-    });
-
-    panel.addEventListener('mousedown', function (e) {
-      var target = e.target;
-      if (!(target instanceof HTMLElement)) return;
-      var suggestion = target.closest('[data-customer-suggestion]');
-      if (!(suggestion instanceof HTMLElement)) return;
-      e.preventDefault();
-      var index = Number(suggestion.getAttribute('data-customer-suggestion'));
-      if (Number.isFinite(index) && visibleSuggestions[index]) {
-        applyCustomerValue(visibleSuggestions[index]);
-      }
-    });
-
-    document.addEventListener('click', function (e) {
-      var target = e.target;
-      if (!(target instanceof Node)) return;
-      if (target === field || panel.contains(target)) return;
-      closePanel();
     });
   }
 
@@ -1935,20 +1754,13 @@ const FILTER_JS = `
 
 const BASE_PATH = "/admin/payments";
 
-function renderFilterBar(
-  filters: ParsedFilters,
-  customerNames: string[]
-): string {
+function renderFilterBar(filters: ParsedFilters): string {
   const hasActive = hasActiveFilters(filters);
   const clearUrl = buildFilterUrl(BASE_PATH, {
     sortBy: filters.sortBy,
     sortDir: filters.sortDir
   });
   const selectedStatuses = filters.statuses ?? [];
-  const customerNamesJson = JSON.stringify(customerNames).replace(
-    /</g,
-    "\\u003c"
-  );
   const calIcon = `<svg class="cal-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/><line x1="1.5" y1="6.5" x2="14.5" y2="6.5"/></svg>`;
 
   return `
@@ -1981,14 +1793,10 @@ function renderFilterBar(
       </div>
       <div class="filter-field">
         <span class="filter-field-label">לקוח</span>
-        <div class="autocomplete-wrap">
-          <input class="filter-input filter-input-wide" type="text" id="filter-customer"
-            value="${escapeHtml(filters.customer ?? "")}"
-            placeholder="שם לקוח"
-            autocomplete="off" />
-          <div class="autocomplete-panel" id="customer-autocomplete-panel" hidden></div>
-          <script type="application/json" id="customer-autocomplete-data">${customerNamesJson}</script>
-        </div>
+        <input class="filter-input filter-input-wide" type="text" id="filter-customer"
+          value="${escapeHtml(filters.customer ?? "")}"
+          placeholder="שם לקוח"
+          autocomplete="off" />
       </div>
       <div class="filter-field">
         <span class="filter-field-label">סטטוס</span>
@@ -2385,9 +2193,16 @@ function renderDashboardRows(items: PaymentListItemView[]) {
     .join("");
 }
 
-function renderPaymentRows(items: PaymentListItemView[], offset: number) {
+function renderPaymentRows(
+  items: PaymentListItemView[],
+  offset: number,
+  hasFilters: boolean
+) {
   if (items.length === 0) {
-    return `<tr><td colspan="8"><div class="empty">עדיין לא נוצרו בקשות תשלום.</div></td></tr>`;
+    const msg = hasFilters
+      ? "לא נמצאו עסקאות התואמות לסינון."
+      : "עדיין לא נוצרו בקשות תשלום.";
+    return `<tr><td colspan="8"><div class="empty">${msg}</div></td></tr>`;
   }
 
   return items
@@ -2703,7 +2518,6 @@ export function renderPaymentsListPage(input: {
   payments: PaymentListResult;
   invoiceByPaymentId: Record<string, InvoiceRecord | null>;
   filters: ParsedFilters;
-  customerNames: string[];
 }) {
   const previousOffset = Math.max(
     0,
@@ -2733,7 +2547,7 @@ export function renderPaymentsListPage(input: {
             <a class="btn btn-primary btn-sm" href="/admin/payments/new">בקשה חדשה</a>
           </div>
         </div>
-        ${renderFilterBar(input.filters, input.customerNames)}
+        ${renderFilterBar(input.filters)}
         <div id="payments-results">
           ${renderFilterChips(input.filters)}
           <table class="data-table">
@@ -2754,7 +2568,8 @@ export function renderPaymentsListPage(input: {
                 payment,
                 invoice: input.invoiceByPaymentId[payment.id] ?? null
               })),
-              input.payments.offset
+              input.payments.offset,
+              !!activeCount
             )}</tbody>
           </table>
           ${
@@ -2889,11 +2704,9 @@ export function renderPaymentDetailsPage(input: {
           input.appConfig.enableDevTools
             ? `
           <details class="disclosure" style="margin-top:12px;">
-            <summary>כלי הדגמה</summary>
+            <summary style="color:var(--ink-soft);font-size:0.85rem;">סימולציית תשלום (דמו)</summary>
             <div class="disclosure-body">
-              <div class="alert alert-info">
-                פעולות אלו נועדו להדגמה מבוקרת של מעבר בין מצבי תשלום ויצירת מסמך דמו.
-              </div>
+              <p style="color:var(--ink-faint);font-size:0.82rem;margin-bottom:12px;">פעולות פנימיות לצורך הדגמה בלבד — לא חלק מהתהליך הרגיל.</p>
               ${renderSimulatorForms(input.payment, `/admin/payments/${input.payment.id}`)}
             </div>
           </details>`

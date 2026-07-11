@@ -107,7 +107,7 @@ export class PaymentWebhookService {
           payment,
           webhook: processed ?? webhook,
           duplicate: false,
-          message: "האירוע תואם לסטטוס סופי קיים ולכן טופל באופן idempotent."
+          message: "הסטטוס עודכן בהצלחה."
         };
       }
 
@@ -136,7 +136,7 @@ export class PaymentWebhookService {
         );
 
       let invoiceAttempt: InvoiceAttemptResult | undefined;
-      let message = "ה-webhook עובד בהצלחה וסטטוס התשלום עודכן.";
+      let message = "הסטטוס עודכן בהצלחה.";
       let responsePayment = updatedPayment;
 
       if (updatedPayment.status === "paid") {
@@ -151,8 +151,8 @@ export class PaymentWebhookService {
               : invoiceAttempt.payment;
           message =
             invoiceAttempt.outcome === "failed"
-              ? "התשלום סומן כשולם, אך יצירת הקבלה המדומה נכשלה."
-              : "ה-webhook עובד בהצלחה, סטטוס התשלום עודכן, וטופלה יצירת קבלה מדומה.";
+              ? "הסטטוס עודכן בהצלחה. יצירת הקבלה המדומה נכשלה."
+              : "הסטטוס עודכן בהצלחה. קבלה הופקה.";
         } catch (error) {
           message =
             error instanceof AppError

@@ -47,6 +47,14 @@ export class InMemoryPaymentRepository implements PaymentRepository {
   private readonly payments = new Map<string, Payment>();
   private readonly webhooks = new Map<string, PaymentWebhookRecord>();
 
+  constructor(seedPayments?: Payment[]) {
+    if (seedPayments) {
+      for (const payment of seedPayments) {
+        this.payments.set(payment.id, payment);
+      }
+    }
+  }
+
   async create(input: CreatePaymentRecordInput): Promise<Payment> {
     if (input.providerTransactionId) {
       const duplicate = await this.findByProviderTransactionId(

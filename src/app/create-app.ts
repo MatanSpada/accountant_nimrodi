@@ -15,6 +15,8 @@ import {
 } from "../middleware/error-middleware";
 import { requestLoggerMiddleware } from "../middleware/request-logger-middleware";
 import { renderStatusPage } from "../ui/admin/admin-page";
+import { InMemoryPaymentRepository } from "../infrastructure/db/in-memory-payment-repository";
+import { DEMO_PAYMENTS } from "../infrastructure/db/demo-seed";
 
 export function createApp(options?: {
   getContainer?: (env?: Env) => AppContainer;
@@ -22,9 +24,24 @@ export function createApp(options?: {
 }) {
   const app = new Hono<{ Bindings: Env }>();
   const getConfig = options?.getConfig ?? ((env?: Env) => getAppConfig(env));
+
+  // Singleton container for in-memory (local dev / no DB) mode so that
+  // data created during one request is visible in the next.
+  let _devContainer: AppContainer | null = null;
+
   const getContainer =
     options?.getContainer ??
-    ((env?: Env) => createContainer(env, undefined, getConfig(env)));
+    ((env?: Env) => {
+      if (env?.DB) return createContainer(env, undefined, getConfig(env));
+      if (!_devContainer) {
+        _devContainer = createContainer(
+          env,
+          { paymentRepository: new InMemoryPaymentRepository(DEMO_PAYMENTS) },
+          getConfig(env)
+        );
+      }
+      return _devContainer;
+    });
 
   app.use("*", requestLoggerMiddleware);
   app.use("*", errorMiddleware);

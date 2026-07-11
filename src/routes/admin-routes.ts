@@ -129,19 +129,16 @@ export function registerAdminRoutes(
       dir: c.req.query("dir")
     });
 
-    const [payments, customerNames] = await Promise.all([
-      container.paymentService.listPayments({
-        limit,
-        offset,
-        statuses: filters.statuses,
-        dateFrom: filters.dateFrom,
-        dateTo: filters.dateTo,
-        customer: filters.customer,
-        sortBy: filters.sortBy,
-        sortDir: filters.sortDir
-      }),
-      container.paymentRepository.listDistinctCustomerNames(300)
-    ]);
+    const payments = await container.paymentService.listPayments({
+      limit,
+      offset,
+      statuses: filters.statuses,
+      dateFrom: filters.dateFrom,
+      dateTo: filters.dateTo,
+      customer: filters.customer,
+      sortBy: filters.sortBy,
+      sortDir: filters.sortDir
+    });
 
     const invoices = await Promise.all(
       payments.items.map((payment) =>
@@ -160,8 +157,7 @@ export function registerAdminRoutes(
         appConfig,
         payments,
         invoiceByPaymentId,
-        filters,
-        customerNames
+        filters
       })
     );
   });
@@ -199,21 +195,22 @@ export function registerAdminRoutes(
     });
 
     const csv = [
-      [
-        "created_at",
-        "customer_name",
-        "customer_phone",
-        "customer_email",
-        "amount",
-        "currency",
-        "status",
-        "invoice_status",
-        "provider",
-        "provider_payment_id",
-        "provider_transaction_id",
-        "invoice_number",
-        "invoice_url"
-      ].join(","),
+      "﻿" + // BOM — allows Excel to open Hebrew CSV correctly
+        [
+          "תאריך",
+          "לקוח",
+          "טלפון",
+          "אימייל",
+          "סכום",
+          "מטבע",
+          "סטטוס תשלום",
+          "סטטוס מסמך",
+          "ספק",
+          "מזהה ספק",
+          "מזהה עסקה",
+          "מספר מסמך",
+          "קישור מסמך"
+        ].join(","),
       ...rows
     ].join("\n");
 

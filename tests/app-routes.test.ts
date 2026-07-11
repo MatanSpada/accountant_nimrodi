@@ -150,7 +150,14 @@ describe("app routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/csv");
-    expect(await response.text()).toContain("customer_email");
+    const csvText = await response.text();
+    // Hebrew headers
+    expect(csvText).toContain("לקוח");
+    expect(csvText).toContain("סכום");
+    expect(csvText).toContain("סטטוס תשלום");
+    // No English headers
+    expect(csvText).not.toContain("customer_name");
+    expect(csvText).not.toContain("customer_email");
   });
 
   it("creates a mocked payment through authenticated APIs and lists it", async () => {
@@ -533,7 +540,7 @@ describe("app routes", () => {
     const detailHtml = await detailPage.text();
     expect(detailHtml).toContain("WhatsApp");
     expect(detailHtml).toContain("התנתקות");
-    expect(detailHtml).toContain("מסמך דמו");
+    expect(detailHtml).toContain("סימולציית תשלום (דמו)");
 
     const paymentApiResponse = await app.request(
       `/api/payments/${createPayload.payment.id}`,
@@ -663,7 +670,6 @@ describe("app routes", () => {
     // Should contain the matching customer row
     expect(html).toContain("ישראל ישראלי");
     // Should NOT contain the other customer in the results area
-    // (it may appear in autocomplete JSON, so check the results div)
     const resultsStart = html.indexOf('id="payments-results"');
     const resultsEnd = html.indexOf("</table>", resultsStart);
     const resultsHtml = html.slice(resultsStart, resultsEnd);
@@ -692,5 +698,43 @@ describe("app routes", () => {
     // Sort links and chips must contain customer param (URL-encoded Hebrew)
     expect(html).toContain("customer=");
     expect(html).toContain("status=paid");
+  });
+
+  it("shows filter-aware empty state when active filter returns no rows", async () => {
+    const { app } = createTestApp();
+    const session = await login(app, "test-admin-password");
+
+    // Create one payment so the repo is not globally empty
+    await app.request("/api/payments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
+      },
+      body: JSON.stringify({
+        customer_name: "לקוח קיים",
+        amount_shekel: "100.00",
+        description: "תשלום"
+      })
+    });
+
+    // Filter by a customer name that doesn't exist → filter-aware empty state
+    const noMatchPage = await app.request(
+      "/admin/payments?customer=לאנמצאמעולם",
+      { headers: { cookie: session.cookie ?? "" } }
+    );
+    const noMatchHtml = await noMatchPage.text();
+    expect(noMatchHtml).toContain("לא נמצאו עסקאות התואמות לסינון.");
+    expect(noMatchHtml).not.toContain("עדיין לא נוצרו בקשות תשלום.");
+
+    // No filter and no payments → global empty state
+    const { app: emptyApp } = createTestApp();
+    const emptySession = await login(emptyApp, "test-admin-password");
+    const emptyPage = await emptyApp.request("/admin/payments", {
+      headers: { cookie: emptySession.cookie ?? "" }
+    });
+    const emptyHtml = await emptyPage.text();
+    expect(emptyHtml).toContain("עדיין לא נוצרו בקשות תשלום.");
+    expect(emptyHtml).not.toContain("לא נמצאו עסקאות התואמות לסינון.");
   });
 });
