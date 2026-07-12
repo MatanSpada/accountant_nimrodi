@@ -10,6 +10,7 @@ import { D1PaymentRepository } from "../infrastructure/db/d1-payment-repository"
 import { D1CustomerRepository } from "../infrastructure/db/d1-customer-repository";
 import { PaymentWebhookService } from "../domain/payments/payment-webhook-service";
 import { parseMockGrowWebhookPayload } from "../infrastructure/grow/mock-grow-webhook-parser";
+import { parseMakeGrowWebhookPayload } from "../infrastructure/grow/make-grow-webhook-parser";
 import { InvoiceService } from "../domain/invoices/invoice-service";
 import type { InvoiceRepository } from "../domain/invoices/invoice-repository";
 import { D1InvoiceRepository } from "../infrastructure/db/d1-invoice-repository";
@@ -69,7 +70,9 @@ export function createContainer(
     paymentWebhookService: new PaymentWebhookService({
       paymentRepository,
       parseMockGrowWebhookPayload,
-      invoiceService
+      parseMakeGrowWebhookPayload,
+      invoiceService,
+      paymentProvider
     })
   };
 }

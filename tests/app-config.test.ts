@@ -112,4 +112,48 @@ describe("app config", () => {
       expect(String(error)).not.toContain("super-secret-grow-key");
     }
   });
+
+  it("keeps make-grow selectable without crashing when config is incomplete", () => {
+    const config = getAppConfig({
+      APP_ENV: "staging",
+      ADMIN_PASSWORD: "staging-password",
+      SESSION_SECRET: "staging-secret",
+      DEFAULT_PAYMENT_PROVIDER: "make-grow",
+      GROW_MODE: "mock",
+      INVOICE_MODE: "mock",
+      ENABLE_DEV_TOOLS: "false"
+    });
+
+    expect(config.defaultPaymentProvider).toBe("make-grow");
+    expect(config.makeGrowConfig).toBeNull();
+    expect(config.makeGrowStatus.hasRequiredConfig).toBe(false);
+    expect(config.makeGrowStatus.missingFields).toContain(
+      "MAKE_CREATE_PAYMENT_LINK_WEBHOOK_URL"
+    );
+  });
+
+  it("builds make-grow config when required webhook values exist", () => {
+    const config = getAppConfig({
+      APP_ENV: "staging",
+      ADMIN_PASSWORD: "staging-password",
+      SESSION_SECRET: "staging-secret",
+      DEFAULT_PAYMENT_PROVIDER: "make-grow",
+      GROW_MODE: "mock",
+      INVOICE_MODE: "mock",
+      ENABLE_DEV_TOOLS: "false",
+      MAKE_CREATE_PAYMENT_LINK_WEBHOOK_URL:
+        "https://hook.make.com/create-payment",
+      MAKE_APPROVE_TRANSACTION_WEBHOOK_URL:
+        "https://hook.make.com/approve-payment",
+      PUBLIC_BASE_URL: "https://payments.example/"
+    });
+
+    expect(config.makeGrowConfig?.createPaymentLinkWebhookUrl).toContain(
+      "create-payment"
+    );
+    expect(config.makeGrowConfig?.publicBaseUrl).toBe(
+      "https://payments.example"
+    );
+    expect(config.makeGrowStatus.hasApproveTransactionWebhook).toBe(true);
+  });
 });

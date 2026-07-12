@@ -27,13 +27,18 @@ export function registerWebhookRoutes(
   });
 
   app.post("/api/grow/webhook", (c) =>
-    c.json(
-      {
-        error:
-          "Real GROW webhook parsing requires verified sandbox/production payload examples."
-      },
-      501
-    )
+    (async () => {
+      const container = getContainer(c.env);
+      const body = await c.req.json().catch(() => {
+        throw new AppError("גוף הבקשה חייב להיות JSON תקין.", 400);
+      });
+
+      const result =
+        await container.paymentWebhookService.processGrowWebhook(body);
+      const status = result.outcome === "failed" ? 422 : 200;
+
+      return c.json(result, status);
+    })()
   );
 
   app.get("/dev/mock-grow/pay/:providerPaymentId", async (c) => {

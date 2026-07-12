@@ -20,6 +20,7 @@ export class PaymentService {
 
   async createPaymentRequest(input: CreatePaymentRequestInput) {
     const validatedInput = validateCreatePaymentDraftInput(input);
+    this.dependencies.paymentProvider.assertReady?.();
     const internalPaymentId = createId("pay");
     const now = new Date().toISOString();
     const customer = await this.resolveCustomer(validatedInput, now);

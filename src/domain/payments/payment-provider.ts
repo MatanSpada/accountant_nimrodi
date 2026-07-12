@@ -17,13 +17,21 @@ export interface ProviderPaymentStatusResult {
   status: PaymentStatus;
 }
 
+export interface ProviderTransactionApprovalInput {
+  payment: Payment;
+  eventType: string;
+  providerEventId: string | null;
+  rawPayload: unknown;
+}
+
 export interface PaymentProvider {
   readonly providerKey: string;
+  assertReady?(): void;
   createPaymentRequest(
     input: CreatePaymentDraftInput & { internalPaymentId: string }
   ): Promise<ProviderPaymentRequest>;
   getPaymentStatus(
     providerPaymentId: string
   ): Promise<ProviderPaymentStatusResult>;
-  approveTransaction?(payment: Payment): Promise<ProviderPaymentStatusResult>;
+  approveTransaction?(input: ProviderTransactionApprovalInput): Promise<void>;
 }

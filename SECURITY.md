@@ -15,13 +15,13 @@ Authentication in phase 6 uses a signed admin session cookie created after login
 - `/ready`
 - `POST /api/grow/webhook`
 
-`/api/grow/webhook` stays unauthenticated because real provider webhooks will need machine-to-machine access later. Real webhook signature / origin verification is still not implemented because real GROW payloads are not available yet.
+`/api/grow/webhook` stays unauthenticated because provider notifications must reach it machine-to-machine. The current implementation supports the Make + GROW path defensively, but exact signature and origin verification still need confirmation from the real provider flow.
 
 ## Secrets handling
 
 - Do not commit real secrets to git.
 - `ADMIN_PASSWORD` and `SESSION_SECRET` must be supplied through environment variables / Cloudflare secrets.
-- GROW credentials must not be logged or exposed in readiness/UI responses.
+- Make webhook secrets and direct GROW credentials must not be logged or exposed in readiness/UI responses.
 - Development defaults exist only for `APP_ENV=development`.
 - Production must not run with development secrets.
 

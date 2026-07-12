@@ -89,7 +89,8 @@ export interface PaymentRepository {
   ): Promise<PaymentWebhookRecord[]>;
   markWebhookProcessed(
     webhookId: string,
-    processedAt: string
+    processedAt: string,
+    processingNote?: string | null
   ): Promise<PaymentWebhookRecord | null>;
   markWebhookFailed(
     webhookId: string,

@@ -44,6 +44,8 @@ function getEnvironmentLabel(appEnv: AppConfig["appEnv"]) {
 }
 
 function getGrowModeLabel(appConfig: AppConfig) {
+  if (appConfig.defaultPaymentProvider === "make-grow") return "GROW דרך Make";
+  if (appConfig.defaultPaymentProvider === "mock-grow") return "דמו";
   if (appConfig.growMode === "mock") return "דמו";
   if (appConfig.growMode === "sandbox") return "סביבת בדיקות";
   return "ייצור";
@@ -51,6 +53,7 @@ function getGrowModeLabel(appConfig: AppConfig) {
 
 function getProviderLabel(provider: string) {
   if (provider === "mock-grow" || provider === "mock_grow") return "דמו";
+  if (provider === "make-grow") return "GROW דרך Make";
   if (provider === "grow") return "GROW";
   return provider;
 }
@@ -60,6 +63,10 @@ function getInvoiceDisplayState(invoice: InvoiceRecord | null) {
   if (invoice.status === "created") return "מסמך זמין";
   if (invoice.status === "failed") return "נדרשת בדיקה";
   return getInvoiceStatusLabel(invoice.status);
+}
+
+function canUseMockInvoiceTools(payment: Payment) {
+  return payment.provider === "mock-grow";
 }
 
 function getWebhookProcessingStatusLabel(
@@ -1904,8 +1911,10 @@ function renderLayout(input: {
   if (input.appConfig.appEnv !== "production") {
     envInfo.push(`סביבה: ${getEnvironmentLabel(input.appConfig.appEnv)}`);
   }
-  if (input.appConfig.growMode === "mock") {
+  if (input.appConfig.defaultPaymentProvider === "mock-grow") {
     envInfo.push("מצב תשלום: דמו");
+  } else if (input.appConfig.defaultPaymentProvider === "make-grow") {
+    envInfo.push("מצב תשלום: GROW דרך Make");
   }
 
   return `<!DOCTYPE html>
@@ -2105,11 +2114,20 @@ function renderInvoiceSection(input: {
   invoice: InvoiceRecord | null;
 }) {
   if (!input.invoice) {
+    const showMockInvoiceAction =
+      input.payment.status === "paid" && canUseMockInvoiceTools(input.payment);
+    const statusMessage =
+      input.payment.status === "paid"
+        ? canUseMockInvoiceTools(input.payment)
+          ? "המערכת תנסה להפיק מסמך דמו בקרוב."
+          : "התשלום אושר. חיבור אוטומטי למסמך או קבלה עדיין לא הוגדר."
+        : "המסמך יופיע לאחר אישור התשלום.";
+
     return `
       <div class="summary-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
         <div class="summary-cell">
           <strong>מצב מסמך</strong>
-          <span>${input.payment.status === "paid" ? "המערכת תנסה להפיק מסמך בקרוב." : "המסמך יופיע לאחר אישור התשלום."}</span>
+          <span>${statusMessage}</span>
         </div>
         <div class="summary-cell">
           <strong>קישור למסמך</strong>
@@ -2117,7 +2135,7 @@ function renderInvoiceSection(input: {
         </div>
       </div>
       ${
-        input.payment.status === "paid"
+        showMockInvoiceAction
           ? `
         <div class="btn-row" style="margin-top:14px;">
           <form method="post" data-mock-invoice-form data-endpoint="/api/payments/${escapeHtml(input.payment.id)}/invoice/mock" data-redirect="/admin/payments/${escapeHtml(input.payment.id)}">
@@ -2130,6 +2148,7 @@ function renderInvoiceSection(input: {
 
   const canRetry =
     input.payment.status === "paid" &&
+    canUseMockInvoiceTools(input.payment) &&
     (input.invoice.status === "failed" || input.invoice.status === "pending");
 
   return `
@@ -2184,7 +2203,7 @@ function renderDashboardRows(items: PaymentListItemView[]) {
         invoice?.invoiceUrl
           ? `<a href="${escapeHtml(invoice.invoiceUrl)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">מסמך</a>`
           : payment.invoiceId
-            ? `<span style="color:var(--ink-faint);font-size:0.8rem">נוצר</span>`
+            ? `<span style="color:var(--ink-faint);font-size:0.8rem">${payment.provider === "make-grow" ? "ממתין להגדרת מסמך" : "נוצר"}</span>`
             : `<span style="color:var(--ink-faint);font-size:0.8rem">—</span>`
       }</td>
       <td style="color:var(--ink-faint);font-size:0.8rem;">${formatDateTime(payment.createdAt)}</td>
@@ -2225,7 +2244,7 @@ function renderPaymentRows(
         invoice?.invoiceUrl
           ? `<a href="${escapeHtml(invoice.invoiceUrl)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">מסמך</a>`
           : payment.invoiceId
-            ? `<span style="color:var(--ink-faint);font-size:0.8rem">נוצר</span>`
+            ? `<span style="color:var(--ink-faint);font-size:0.8rem">${payment.provider === "make-grow" ? "ממתין להגדרת מסמך" : "נוצר"}</span>`
             : `<span style="color:var(--ink-faint);font-size:0.8rem">—</span>`
       }</td>
       <td>
@@ -2823,6 +2842,12 @@ export function renderMockInvoicePage(input: {
 }
 
 export function renderClientRequirementsPage(input: { appConfig: AppConfig }) {
+  const makeGrowMessage =
+    input.appConfig.defaultPaymentProvider === "make-grow" &&
+    !input.appConfig.makeGrowStatus.hasRequiredConfig
+      ? "חיבור Make לא מוגדר — חסרה כתובת webhook ליצירת קישור תשלום."
+      : null;
+
   return renderLayout({
     appConfig: input.appConfig,
     title: "סטטוס מערכת",
@@ -2846,25 +2871,38 @@ export function renderClientRequirementsPage(input: { appConfig: AppConfig }) {
             </div>
           </div>
           <div class="alert alert-info" style="margin-top:16px;">
-            בסביבת הדגמה הלקוח רואה את המערכת המלאה ללא חיבור לשירותים חיצוניים.
+            ${
+              input.appConfig.defaultPaymentProvider === "make-grow"
+                ? "המערכת מוכנה לחיבור GROW דרך Make, אך יצירת קבלות אוטומטית עדיין ממתינה לאימות והגדרה."
+                : "בסביבת הדגמה המערכת פועלת ללא חיבור פעיל לשירותי תשלום חיצוניים."
+            }
           </div>
+          ${
+            makeGrowMessage
+              ? `<div class="alert alert-danger" style="margin-top:12px;">${escapeHtml(makeGrowMessage)}</div>`
+              : ""
+          }
         </div>
 
         <div class="card">
-          <div class="card-header"><h3>פעולות</h3></div>
-          <div class="quick-links">
-            <a class="quick-link" href="/admin/payments/export.csv">
-              <span>ייצוא נתונים</span>
-              <span class="quick-link-arrow">‹</span>
-            </a>
-            <a class="quick-link" href="/admin/payments/new">
-              <span>בקשה חדשה</span>
-              <span class="quick-link-arrow">‹</span>
-            </a>
-            <a class="quick-link" href="/admin/payments">
-              <span>מעקב עסקאות</span>
-              <span class="quick-link-arrow">‹</span>
-            </a>
+          <div class="card-header"><h3>חיבורי ספקים</h3></div>
+          <div class="summary-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+            <div class="summary-cell">
+              <strong>ספק תשלום פעיל</strong>
+              <span>${escapeHtml(getGrowModeLabel(input.appConfig))}</span>
+            </div>
+            <div class="summary-cell">
+              <strong>Webhook ליצירת קישור</strong>
+              <span>${input.appConfig.makeGrowStatus.hasRequiredConfig ? "מוגדר" : "חסר"}</span>
+            </div>
+            <div class="summary-cell">
+              <strong>Webhook ל־Approve Transaction</strong>
+              <span>${input.appConfig.makeGrowStatus.hasApproveTransactionWebhook ? "מוגדר" : "לא הוגדר"}</span>
+            </div>
+            <div class="summary-cell">
+              <strong>כתובת ציבורית</strong>
+              <span>${input.appConfig.makeGrowStatus.hasPublicBaseUrl ? "מוגדרת" : "חסרה"}</span>
+            </div>
           </div>
         </div>
       </div>

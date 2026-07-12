@@ -1,5 +1,6 @@
 import { createId } from "../../shared/types/entity-id";
 import { AppError } from "../../shared/errors/app-error";
+import { logger } from "../../shared/logger/logger";
 import type { PaymentRepository } from "./payment-repository";
 import type { Payment } from "./payment-types";
 import type { PaymentWebhookRecord } from "./payment-webhook-types";
@@ -9,10 +10,14 @@ import {
   isIdempotentFinalStatusMatch
 } from "./payment-webhook-validation";
 import type { ParsedMockGrowWebhook } from "../../infrastructure/grow/mock-grow-webhook-parser";
+import type { ParsedMakeGrowWebhook } from "../../infrastructure/grow/make-grow-webhook-parser";
 import type {
   InvoiceAttemptResult,
   InvoiceService
 } from "../invoices/invoice-service";
+import type { PaymentProvider } from "./payment-provider";
+
+type ParsedWebhook = ParsedMockGrowWebhook | ParsedMakeGrowWebhook;
 
 export type ProcessMockWebhookResult =
   | {
@@ -45,7 +50,9 @@ export class PaymentWebhookService {
     private readonly dependencies: {
       paymentRepository: PaymentRepository;
       parseMockGrowWebhookPayload: (payload: unknown) => ParsedMockGrowWebhook;
+      parseMakeGrowWebhookPayload: (payload: unknown) => ParsedMakeGrowWebhook;
       invoiceService: InvoiceService;
+      paymentProvider: PaymentProvider;
     }
   ) {}
 
@@ -53,6 +60,29 @@ export class PaymentWebhookService {
     payload: unknown
   ): Promise<ProcessMockWebhookResult> {
     const parsed = this.dependencies.parseMockGrowWebhookPayload(payload);
+    return this.processParsedWebhook(parsed, {
+      autoCreateInvoice: true,
+      approveTransaction: false
+    });
+  }
+
+  async processGrowWebhook(
+    payload: unknown
+  ): Promise<ProcessMockWebhookResult> {
+    const parsed = this.dependencies.parseMakeGrowWebhookPayload(payload);
+    return this.processParsedWebhook(parsed, {
+      autoCreateInvoice: false,
+      approveTransaction: true
+    });
+  }
+
+  private async processParsedWebhook(
+    parsed: ParsedWebhook,
+    behavior: {
+      autoCreateInvoice: boolean;
+      approveTransaction: boolean;
+    }
+  ): Promise<ProcessMockWebhookResult> {
     const duplicate =
       await this.dependencies.paymentRepository.findWebhookByProviderEventId(
         parsed.provider,
@@ -94,6 +124,23 @@ export class PaymentWebhookService {
       }
 
       assertWebhookPaymentMatch(payment, parsed);
+
+      if (!parsed.status) {
+        const processed =
+          await this.dependencies.paymentRepository.markWebhookProcessed(
+            webhook.id,
+            new Date().toISOString(),
+            "התקבל אירוע שלא זוהה לסטטוס פנימי. נשמר payload גולמי לבדיקה."
+          );
+
+        return {
+          outcome: "processed",
+          payment,
+          webhook: processed ?? webhook,
+          duplicate: false,
+          message: "האירוע נשמר לבדיקה, ללא שינוי סטטוס."
+        };
+      }
 
       if (isIdempotentFinalStatusMatch(payment.status, parsed.status)) {
         const processed =
@@ -139,7 +186,7 @@ export class PaymentWebhookService {
       let message = "הסטטוס עודכן בהצלחה.";
       let responsePayment = updatedPayment;
 
-      if (updatedPayment.status === "paid") {
+      if (updatedPayment.status === "paid" && behavior.autoCreateInvoice) {
         try {
           invoiceAttempt =
             await this.dependencies.invoiceService.ensureInvoiceForPaymentRecord(
@@ -158,6 +205,47 @@ export class PaymentWebhookService {
             error instanceof AppError
               ? `התשלום סומן כשולם, אך יצירת הקבלה נתקלה בשגיאה: ${error.message}`
               : "התשלום סומן כשולם, אך יצירת הקבלה נתקלה בשגיאה לא ידועה.";
+        }
+      }
+
+      if (
+        behavior.approveTransaction &&
+        payment.provider === this.dependencies.paymentProvider.providerKey &&
+        this.dependencies.paymentProvider.approveTransaction
+      ) {
+        try {
+          await this.dependencies.paymentProvider.approveTransaction({
+            payment: updatedPayment,
+            eventType: parsed.eventType,
+            providerEventId: parsed.eventId,
+            rawPayload:
+              "originalPayload" in parsed
+                ? parsed.originalPayload
+                : parsed.rawPayload
+          });
+        } catch (error) {
+          const approvalMessage =
+            "התשלום עודכן, אך קריאת Approve Transaction דרך Make נכשלה.";
+          const processedWithNote =
+            await this.dependencies.paymentRepository.markWebhookProcessed(
+              webhook.id,
+              new Date().toISOString(),
+              approvalMessage
+            );
+          logger.error("provider_transaction_approval_failed", {
+            paymentId: updatedPayment.id,
+            provider: updatedPayment.provider,
+            message: error instanceof Error ? error.message : "unknown_error"
+          });
+
+          return {
+            outcome: "processed",
+            payment: responsePayment,
+            webhook: processedWithNote ?? processed ?? webhook,
+            duplicate: false,
+            message: `${message} ${approvalMessage}`,
+            invoiceAttempt
+          };
         }
       }
 
@@ -199,7 +287,17 @@ export class PaymentWebhookService {
     );
   }
 
-  private async findPaymentForWebhook(parsed: ParsedMockGrowWebhook) {
+  private async findPaymentForWebhook(parsed: ParsedWebhook) {
+    if ("internalPaymentId" in parsed && parsed.internalPaymentId) {
+      const byInternalId = await this.dependencies.paymentRepository.findById(
+        parsed.internalPaymentId
+      );
+
+      if (byInternalId) {
+        return byInternalId;
+      }
+    }
+
     if (parsed.providerPaymentId) {
       const byPaymentId =
         await this.dependencies.paymentRepository.findByProviderPaymentId(

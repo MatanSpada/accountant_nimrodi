@@ -5,11 +5,17 @@ import {
   type PaymentStatus
 } from "./payment-status";
 import type { Payment } from "./payment-types";
-import type { ParsedMockGrowWebhook } from "../../infrastructure/grow/mock-grow-webhook-parser";
+
+interface ParsedPaymentWebhookForValidation {
+  providerPaymentId: string | null;
+  providerTransactionId: string | null;
+  amountAgorot: number | null;
+  currency: Payment["currency"] | null;
+}
 
 export function assertWebhookPaymentMatch(
   payment: Payment,
-  webhook: ParsedMockGrowWebhook
+  webhook: ParsedPaymentWebhookForValidation
 ) {
   if (
     webhook.providerPaymentId &&
@@ -27,11 +33,14 @@ export function assertWebhookPaymentMatch(
     throw new AppError("provider_transaction_id אינו תואם לתשלום שנמצא.", 422);
   }
 
-  if (payment.amountAgorot !== webhook.amountAgorot) {
+  if (
+    webhook.amountAgorot !== null &&
+    payment.amountAgorot !== webhook.amountAgorot
+  ) {
     throw new AppError("סכום ה-webhook אינו תואם לתשלום.", 422);
   }
 
-  if (payment.currency !== webhook.currency) {
+  if (webhook.currency !== null && payment.currency !== webhook.currency) {
     throw new AppError("מטבע ה-webhook אינו תואם לתשלום.", 422);
   }
 }

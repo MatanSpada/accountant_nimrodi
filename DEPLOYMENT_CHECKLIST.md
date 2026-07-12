@@ -15,25 +15,29 @@
 - `ADMIN_PASSWORD`
 - `SESSION_SECRET`
 - `ENABLE_DEV_TOOLS`
+- `DEFAULT_PAYMENT_PROVIDER`
 - `GROW_MODE`
-- `GROW_USER_ID`, only for sandbox/production
-- `GROW_PAGE_CODE`, only for sandbox/production
-- `GROW_API_BASE_URL`, only for sandbox/production
-- `GROW_SUCCESS_URL`
-- `GROW_CANCEL_URL`
-- `GROW_NOTIFY_URL`
-- `GROW_INVOICE_NOTIFY_URL` if needed
+- `PUBLIC_BASE_URL`
+- `MAKE_CREATE_PAYMENT_LINK_WEBHOOK_URL` when `DEFAULT_PAYMENT_PROVIDER=make-grow`
+- `MAKE_CREATE_PAYMENT_LINK_SECRET` if configured
+- `MAKE_APPROVE_TRANSACTION_WEBHOOK_URL` if configured
+- `MAKE_APPROVE_TRANSACTION_SECRET` if configured
+- `GROW_USER_ID`, only for sandbox/production direct API
+- `GROW_PAGE_CODE`, only for sandbox/production direct API
+- `GROW_API_BASE_URL`, only for sandbox/production direct API
+- `GROW_SUCCESS_URL`, `GROW_CANCEL_URL`, `GROW_NOTIFY_URL`, `GROW_INVOICE_NOTIFY_URL` only for the direct API path
 - invoice provider credentials later if an external invoice provider is used
 
 ## GROW requirements before real payment
 
 - client-owned GROW account
-- API access enabled
+- Make account/scenario configured if using `make-grow`
+- API access enabled only if using the direct API path
 - bank transfer enabled
 - webhook enabled
-- sandbox credentials/details
-- production credentials/details
-- verified webhook payload examples
+- sandbox credentials/details if using the direct API path
+- production credentials/details if using the direct API path
+- verified webhook payload examples from the real Make + GROW flow
 - confirmation whether bank-transfer-only payment page is supported
 - invoice decision: GROW documents or external invoice provider
 

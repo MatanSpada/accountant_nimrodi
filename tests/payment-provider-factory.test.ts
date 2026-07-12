@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createPaymentProvider } from "../src/infrastructure/grow/payment-provider-factory";
 import { GrowPaymentProvider } from "../src/infrastructure/grow/grow-payment-provider";
+import { MakeGrowPaymentProvider } from "../src/infrastructure/grow/make-grow-payment-provider";
 import { MockPaymentProvider } from "../src/infrastructure/grow/mock-payment-provider";
 import { getAppConfig } from "../src/shared/config/app-config";
 
@@ -59,5 +60,48 @@ describe("payment provider factory", () => {
     const provider = createPaymentProvider(config);
 
     expect(provider).toBeInstanceOf(GrowPaymentProvider);
+  });
+
+  it("selects MakeGrowPaymentProvider when configured through DEFAULT_PAYMENT_PROVIDER", () => {
+    const config = getAppConfig({
+      APP_ENV: "staging",
+      ADMIN_PASSWORD: "staging-password",
+      SESSION_SECRET: "staging-secret",
+      DEFAULT_PAYMENT_PROVIDER: "make-grow",
+      GROW_MODE: "mock",
+      INVOICE_MODE: "mock",
+      ENABLE_DEV_TOOLS: "false",
+      MAKE_CREATE_PAYMENT_LINK_WEBHOOK_URL:
+        "https://hook.make.com/create-payment",
+      PUBLIC_BASE_URL: "https://payments.example"
+    });
+
+    const provider = createPaymentProvider(config);
+
+    expect(provider).toBeInstanceOf(MakeGrowPaymentProvider);
+  });
+
+  it("returns a safe unavailable provider when make-grow config is missing", async () => {
+    const config = getAppConfig({
+      APP_ENV: "staging",
+      ADMIN_PASSWORD: "staging-password",
+      SESSION_SECRET: "staging-secret",
+      DEFAULT_PAYMENT_PROVIDER: "make-grow",
+      GROW_MODE: "mock",
+      INVOICE_MODE: "mock",
+      ENABLE_DEV_TOOLS: "false"
+    });
+
+    const provider = createPaymentProvider(config);
+
+    await expect(
+      provider.createPaymentRequest({
+        internalPaymentId: "pay_123",
+        customerName: "לקוח",
+        amountAgorot: 100,
+        currency: "ILS",
+        description: "בדיקה"
+      })
+    ).rejects.toThrow("חיבור Make לא מוגדר");
   });
 });

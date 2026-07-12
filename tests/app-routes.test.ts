@@ -6,6 +6,7 @@ import { getAppConfig } from "../src/shared/config/app-config";
 import { InMemoryCustomerRepository } from "../src/infrastructure/db/in-memory-customer-repository";
 import { InMemoryInvoiceRepository } from "../src/infrastructure/db/in-memory-invoice-repository";
 import { InMemoryPaymentRepository } from "../src/infrastructure/db/in-memory-payment-repository";
+import type { PaymentProvider } from "../src/domain/payments/payment-provider";
 
 function createTestApp(input?: {
   enableDevTools?: boolean;
@@ -114,10 +115,8 @@ describe("app routes", () => {
       },
       body: JSON.stringify({})
     });
-    expect(growWebhookResponse.status).toBe(501);
-    expect(await growWebhookResponse.text()).toContain(
-      "verified sandbox/production payload examples"
-    );
+    expect(growWebhookResponse.status).toBe(400);
+    expect(await growWebhookResponse.text()).toContain("לא נמצא מזהה פנימי");
   });
 
   it("requires auth for CSV export and returns CSV when authenticated", async () => {
@@ -628,6 +627,115 @@ describe("app routes", () => {
     );
     expect(mockInvoicePage.status).toBe(200);
     expect(await mockInvoicePage.text()).toContain("מסמך דמו");
+  });
+
+  it("processes the public make-grow webhook without login and does not create a mock invoice", async () => {
+    const paymentRepository = new InMemoryPaymentRepository();
+    const customerRepository = new InMemoryCustomerRepository();
+    const invoiceRepository = new InMemoryInvoiceRepository();
+    const paymentProvider: PaymentProvider = {
+      providerKey: "make-grow",
+      async createPaymentRequest(input) {
+        return {
+          provider: "make-grow",
+          providerPaymentId: `make_process_${input.internalPaymentId}`,
+          providerTransactionId: `make_tx_${input.internalPaymentId}`,
+          paymentUrl: "https://grow.example/pay/mock",
+          status: "payment_created",
+          rawReference: { mode: "make-grow" }
+        };
+      },
+      async getPaymentStatus(providerPaymentId) {
+        return {
+          provider: "make-grow",
+          providerPaymentId,
+          providerTransactionId: null,
+          status: "payment_created"
+        };
+      }
+    };
+    const container = createContainer(
+      undefined,
+      {
+        paymentRepository,
+        customerRepository,
+        invoiceRepository,
+        paymentProvider
+      },
+      getAppConfig({
+        APP_ENV: "staging",
+        ADMIN_PASSWORD: "staging-password",
+        SESSION_SECRET: "staging-secret",
+        DEFAULT_PAYMENT_PROVIDER: "make-grow",
+        GROW_MODE: "mock",
+        INVOICE_MODE: "mock",
+        ENABLE_DEV_TOOLS: "false",
+        MAKE_CREATE_PAYMENT_LINK_WEBHOOK_URL:
+          "https://hook.make.com/create-payment",
+        PUBLIC_BASE_URL: "https://payments.example"
+      })
+    );
+    const app = createApp({
+      getContainer: () => container,
+      getConfig: () =>
+        getAppConfig({
+          APP_ENV: "staging",
+          ADMIN_PASSWORD: "staging-password",
+          SESSION_SECRET: "staging-secret",
+          DEFAULT_PAYMENT_PROVIDER: "make-grow",
+          GROW_MODE: "mock",
+          INVOICE_MODE: "mock",
+          ENABLE_DEV_TOOLS: "false",
+          MAKE_CREATE_PAYMENT_LINK_WEBHOOK_URL:
+            "https://hook.make.com/create-payment",
+          PUBLIC_BASE_URL: "https://payments.example"
+        })
+    });
+
+    const session = await login(app, "staging-password");
+    const createResponse = await app.request("/api/payments", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie ?? ""
+      },
+      body: JSON.stringify({
+        customer_name: "לקוח Make route",
+        amount_shekel: "1250.00",
+        description: "תשלום דרך Make"
+      })
+    });
+    const createPayload = (await createResponse.json()) as {
+      payment: {
+        id: string;
+        providerPaymentId: string;
+        providerTransactionId: string;
+      };
+    };
+
+    const webhookResponse = await app.request("/api/grow/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        payment_id: createPayload.payment.id,
+        paymentLinkProcessId: createPayload.payment.providerPaymentId,
+        transactionId: createPayload.payment.providerTransactionId,
+        status: "success",
+        amount: "1250.00",
+        currency: "ILS"
+      })
+    });
+
+    expect(webhookResponse.status).toBe(200);
+    const webhookPayload = (await webhookResponse.json()) as {
+      payment: { status: string; invoiceId: string | null };
+      message: string;
+    };
+    expect(webhookPayload.payment.status).toBe("paid");
+    expect(webhookPayload.payment.invoiceId).toBeNull();
+    expect(webhookPayload.message).not.toContain("קבלה הופקה");
   });
 
   it("filters payments by customer name and renders matching rows", async () => {

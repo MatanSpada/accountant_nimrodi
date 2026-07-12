@@ -57,6 +57,14 @@ Open `/admin/payments/:id` to see:
 - If allowed, use the manual mock retry action for development verification
 - In real production later, replace this with the approved invoice-provider retry flow
 
+### No invoice was created for a paid Make/GROW payment
+
+- This is expected until the real invoice path is confirmed
+- The payment can still be validly marked as `paid`
+- Review whether the client chose:
+  - GROW-issued documents
+  - or an external invoice provider
+
 ## CSV export
 
 Use:
@@ -110,14 +118,14 @@ Expected behavior:
 
 1. Keep the current deployment
 2. Add verified sandbox GROW settings
-3. Set `GROW_MODE=sandbox`
-4. Keep real webhook parsing disabled until verified payload examples exist
-5. Validate payment creation against the sandbox account
+3. Prefer `DEFAULT_PAYMENT_PROVIDER=make-grow` for the current MVP path
+4. Configure the Make `Create Payment Link` scenario and `PUBLIC_BASE_URL`
+5. Keep invoice automation disabled until the real document flow is confirmed
 
 ## Switching from sandbox to production later
 
 1. Verify sandbox behavior
-2. Replace sandbox endpoints/credentials with production values
-3. Set `GROW_MODE=production`
+2. If using Make, switch the Make scenario to production GROW credentials
+3. If using the direct API path, replace sandbox endpoints/credentials with production values and set `GROW_MODE=production`
 4. Keep `ENABLE_DEV_TOOLS=false`
 5. Re-verify `/health`, `/ready`, login, payment creation, and webhook reachability

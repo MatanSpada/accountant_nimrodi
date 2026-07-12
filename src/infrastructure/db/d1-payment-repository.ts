@@ -601,7 +601,8 @@ export class D1PaymentRepository implements PaymentRepository {
 
   async markWebhookProcessed(
     webhookId: string,
-    processedAt: string
+    processedAt: string,
+    processingNote?: string | null
   ): Promise<PaymentWebhookRecord | null> {
     await this.db
       .prepare(
@@ -610,11 +611,11 @@ export class D1PaymentRepository implements PaymentRepository {
           SET
             processed_at = ?,
             processing_status = 'processed',
-            processing_error = NULL
+            processing_error = ?
           WHERE id = ?
         `
       )
-      .bind(processedAt, webhookId)
+      .bind(processedAt, processingNote ?? null, webhookId)
       .run();
 
     const row = await this.db

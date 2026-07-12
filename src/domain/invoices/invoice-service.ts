@@ -60,6 +60,16 @@ export class InvoiceService {
   ): Promise<InvoiceAttemptResult> {
     assertInvoiceCreatablePayment(payment);
 
+    if (
+      this.dependencies.invoiceProvider.providerKey === "mock-invoice" &&
+      payment.provider !== "mock-grow"
+    ) {
+      throw new AppError(
+        "מסמך דמו זמין רק עבור תשלומי דמו. עבור GROW דרך Make נדרש חיבור מסמכים אמיתי.",
+        422
+      );
+    }
+
     const existing = await this.dependencies.invoiceRepository.findByPaymentId(
       payment.id
     );

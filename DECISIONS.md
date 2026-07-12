@@ -410,3 +410,67 @@
 - Tradeoff:
   - there is a little more response-handling code in the app shell
   - future logging/observability integration should preserve the same no-secrets boundary
+
+## Why Make is now the recommended GROW integration path
+
+- GROW quoted a recurring monthly cost for direct API usage, while Make can use the official GROW app for the MVP path.
+- Meaning:
+  - the app sends payment creation requests to a Make webhook instead of calling GROW directly
+  - Make becomes the integration bridge for both `Create Payment Link` and `Approve Transaction`
+  - the existing mock flow stays untouched for safe local and staging work
+- Tradeoff:
+  - there is now an extra dependency on Make scenario configuration
+  - exact incoming webhook payload fields still need confirmation from a real Make + GROW flow
+
+## Provider selection decision after Make
+
+- `DEFAULT_PAYMENT_PROVIDER` is now the primary selector for payment creation.
+- Supported values are:
+  - `mock-grow`
+  - `make-grow`
+  - `grow`
+- Meaning:
+  - payment-provider choice is explicit and does not rely only on `GROW_MODE`
+  - the older direct-GROW adapter remains available in code without being the recommended path
+- Tradeoff:
+  - runtime config is slightly more explicit
+  - docs and status pages must explain both `DEFAULT_PAYMENT_PROVIDER` and `GROW_MODE`
+
+## Why incomplete Make config does not crash the whole admin UI
+
+- When `DEFAULT_PAYMENT_PROVIDER=make-grow` but the required webhook URL is missing, the UI still loads and shows a clear status message.
+- Meaning:
+  - operators can open the admin and see what is missing
+  - payment creation is blocked safely before any real provider request is attempted
+- Tradeoff:
+  - provider readiness is enforced at payment-creation time instead of hard-failing the entire app startup
+
+## Why Make/GROW webhook parsing is defensive
+
+- The project does not yet have a fully verified production webhook contract from the real Make + GROW flow.
+- Meaning:
+  - the parser accepts several candidate field names for identifiers and status fields
+  - unknown statuses are stored without changing the payment state
+  - amount and currency are validated only when they are present in the payload
+- Tradeoff:
+  - some payload assumptions remain TODO items until sandbox data is captured
+  - stricter signature or schema validation must be added later
+
+## Why Approve Transaction happens after persistence
+
+- GROW can repeat notifications until `Approve Transaction` is performed.
+- Meaning:
+  - the app first stores the raw event and updates the payment safely
+  - only after persistence succeeds does it call the Make approve webhook
+  - approval failure is logged and attached as a processing note without rolling back the paid payment
+- Tradeoff:
+  - a temporary mismatch can exist where the payment is paid but the upstream approval still failed and needs operational follow-up
+
+## Why mock invoices are blocked for make-grow payments
+
+- A paid `make-grow` payment is a real-payment path, even if invoice automation is still missing.
+- Meaning:
+  - the UI no longer implies that a real receipt was issued
+  - mock invoice creation remains available only for `mock-grow` demo payments
+- Tradeoff:
+  - paid Make/GROW payments may show "document not configured yet" until the invoice decision is finalized

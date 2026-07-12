@@ -12,28 +12,41 @@
   - `SESSION_SECRET`
 - Production decision for `ENABLE_DEV_TOOLS=false`
 
-## Must have before real GROW sandbox
+## Must have before real GROW sandbox through Make
 
 - Client-owned GROW account
+- Phone number connected to the GROW account for verification if required by GROW
+- Client-owned or project-owned Make account
+- Make scenario/webhook for `Create Payment Link`
+- Cloudflare deployment URL or public domain for the notify webhook
+- Confirmation that bank transfer is enabled in GROW
+- Confirmation that the Make GROW action can be restricted to bank transfer only
+- Confirmation that the payment page can be bank-transfer-only in the real account
+- Confirmation that webhooks are enabled in GROW
+- Verified webhook payload examples as they arrive from the real Make + GROW flow
+- Confirmation that `send method` can be set to `none` / `ללא`
+- Confirmation that `Approve Transaction` is available through the Make GROW app
+
+## Must have before direct GROW API sandbox
+
 - GROW `userId`
 - GROW `pageCode`
 - Verified sandbox endpoint/details
 - API credentials if the verified sandbox account/docs require them
 - Confirmation that API access is enabled in GROW
-- Confirmation that bank transfer is enabled in GROW
-- Confirmation whether the payment page can be bank-transfer-only
-- Confirmation whether bank-transfer-only is supported by the real GROW API/page configuration
-- Confirmation that webhooks are enabled in GROW
-- Verified sandbox webhook payload examples
 
 ## Must have before production payments
 
-- Verified production endpoint/details
+- Final choice of payment path:
+  - `DEFAULT_PAYMENT_PROVIDER=make-grow`
+  - or `DEFAULT_PAYMENT_PROVIDER=grow`
+- Production Make scenario/webhook details if Make remains the selected path
+- Verified production endpoint/details if the direct API path is selected
 - Production credentials if required by the verified account/docs
 - Verified production webhook payload examples if different from sandbox
 - Confirmation whether GROW issues receipts/invoices for bank-transfer payments
-- Final choice for `GROW_MODE=production`
-- Final public URLs for:
+- Final choice for `GROW_MODE=production` only if the direct API path is selected
+- Final public URLs for the direct API path:
   - `GROW_SUCCESS_URL`
   - `GROW_CANCEL_URL`
   - `GROW_NOTIFY_URL`

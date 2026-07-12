@@ -7,6 +7,7 @@ import { InMemoryPaymentRepository } from "../src/infrastructure/db/in-memory-pa
 import { InMemoryCustomerRepository } from "../src/infrastructure/db/in-memory-customer-repository";
 import { MockPaymentProvider } from "../src/infrastructure/grow/mock-payment-provider";
 import { parseMockGrowWebhookPayload } from "../src/infrastructure/grow/mock-grow-webhook-parser";
+import { parseMakeGrowWebhookPayload } from "../src/infrastructure/grow/make-grow-webhook-parser";
 import { InMemoryInvoiceRepository } from "../src/infrastructure/db/in-memory-invoice-repository";
 import { MockInvoiceProvider } from "../src/infrastructure/invoices/mock-invoice-provider";
 
@@ -27,6 +28,8 @@ async function createServices() {
   const paymentWebhookService = new PaymentWebhookService({
     paymentRepository,
     parseMockGrowWebhookPayload,
+    parseMakeGrowWebhookPayload,
+    paymentProvider: new MockPaymentProvider(),
     invoiceService
   });
   const payment = await paymentService.createPaymentRequest({

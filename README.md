@@ -14,15 +14,16 @@ The system currently supports:
 6. Automatic creation of exactly one mock invoice after a paid webhook.
 7. Safe duplicate webhook handling.
 8. CSV export of payments for internal review.
-9. A configurable real `GrowPaymentProvider` behind validated config, while leaving mock mode as the default.
+9. A configurable payment-provider layer with `mock-grow`, `make-grow`, and the legacy direct `grow` adapter kept behind config.
 
 ## Final MVP state
 
 - Hosting target: Cloudflare Workers
 - Database target: Cloudflare D1
-- Default payment mode: `GROW_MODE=mock`
+- Default payment provider: `DEFAULT_PAYMENT_PROVIDER=mock-grow`
 - Default invoice mode: `INVOICE_MODE=mock`
-- Real GROW webhook parsing: not implemented yet
+- Recommended real integration path: `make-grow` through Make.com
+- Real GROW webhook parsing: implemented defensively for the Make path, but exact payload mapping still needs real sandbox confirmation
 - Real invoice provider: not implemented yet
 - CRM integration: not implemented yet
 
@@ -72,6 +73,7 @@ Mock mode requires no GROW credentials:
 
 ```env
 APP_ENV=development
+DEFAULT_PAYMENT_PROVIDER=mock-grow
 GROW_MODE=mock
 INVOICE_MODE=mock
 ENABLE_DEV_TOOLS=true
@@ -99,22 +101,34 @@ Useful URLs:
 
 ## Grow modes
 
-### `GROW_MODE=mock`
+### `DEFAULT_PAYMENT_PROVIDER=mock-grow`
 
 - default mode
-- no real GROW credentials required
+- no real GROW or Make credentials required
 - uses `MockPaymentProvider`
+
+### `DEFAULT_PAYMENT_PROVIDER=make-grow`
+
+- recommended MVP integration path
+- the app sends payment data to a Make webhook
+- Make uses the official GROW app action `Create Payment Link`
+- the app expects Make to return the payment URL and provider identifiers
+- paid notifications can trigger a second Make webhook for `Approve Transaction`
+- real receipt creation is still not configured in this path
+
+### `GROW_MODE=mock`
+
+- keeps the legacy direct-GROW adapter disabled while mock mode is active
 
 ### `GROW_MODE=sandbox`
 
-- uses `GrowPaymentProvider`
-- requires validated sandbox config
-- still does not enable real webhook parsing
+- used only when `DEFAULT_PAYMENT_PROVIDER=grow`
+- requires validated sandbox config for the legacy direct-GROW adapter
 
 ### `GROW_MODE=production`
 
-- uses `GrowPaymentProvider`
-- requires validated production config
+- used only when `DEFAULT_PAYMENT_PROVIDER=grow`
+- requires validated production config for the legacy direct-GROW adapter
 - `mock` in `APP_ENV=production` is blocked unless `ALLOW_MOCK_GROW_IN_PRODUCTION=true`
 
 ## Required configuration
@@ -139,6 +153,14 @@ Required only for `GROW_MODE=sandbox|production`:
 - `GROW_INVOICE_NOTIFY_URL` if needed
 - `GROW_API_KEY` only if the verified account/docs require it
 
+Required for `DEFAULT_PAYMENT_PROVIDER=make-grow`:
+
+- `MAKE_CREATE_PAYMENT_LINK_WEBHOOK_URL`
+- `PUBLIC_BASE_URL`
+- `MAKE_CREATE_PAYMENT_LINK_SECRET` if a shared secret is configured in Make
+- `MAKE_APPROVE_TRANSACTION_WEBHOOK_URL` if the Make scenario also handles `Approve Transaction`
+- `MAKE_APPROVE_TRANSACTION_SECRET` if a shared secret is configured for the approve webhook
+
 Optional tracked flag:
 
 - `GROW_FORCE_BANK_TRANSFER_ONLY`
@@ -146,7 +168,9 @@ Optional tracked flag:
 Important:
 
 - The app does not send any unverified bank-transfer-only field to GROW yet.
-- Real GROW webhook parsing is still blocked until verified payload examples exist locally.
+- The app sends `allowed_payment_methods=["bank_transfer"]` to Make for clarity, but the exact field mapping inside Make still needs confirmation.
+
+See [MAKE_GROW_INTEGRATION.md](/home/matan/Documents/accountant_nimrodi/MAKE_GROW_INTEGRATION.md).
 
 ## Health and readiness
 
@@ -292,7 +316,7 @@ Current behavior:
 
 ## What is still not implemented
 
-- Real GROW webhook parsing
+- Exact GROW webhook payload confirmation from a real sandbox/production account
 - Real GROW webhook verification/signature logic
 - Real invoice provider integration
 - Real CRM integration
@@ -303,8 +327,8 @@ Current behavior:
 
 - Mock payment pages
 - Mock webhook payload schema
-- Mock invoice generation
-- Mock invoice pages
+- Mock invoice generation for `mock-grow` only
+- Mock invoice pages for `mock-grow` only
 - WhatsApp sending itself
 
 ## Next steps after receiving client details
@@ -312,9 +336,9 @@ Current behavior:
 1. Add the client-owned Cloudflare account access.
 2. Create the real D1 database in that account.
 3. Set production admin secrets.
-4. Add verified GROW sandbox config.
-5. Validate the `GrowPaymentProvider` request/response mapping against the real sandbox account.
-6. Implement real GROW webhook parsing only after verified payloads are available.
+4. Build the Make scenario for `Create Payment Link`.
+5. Build the Make scenario for `Approve Transaction`.
+6. Validate the incoming webhook payload from real GROW notifications through Make.
 7. Decide whether invoices come from GROW or from an external provider.
 
 ## Verified commands

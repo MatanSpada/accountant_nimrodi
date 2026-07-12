@@ -306,7 +306,8 @@ export class InMemoryPaymentRepository implements PaymentRepository {
 
   async markWebhookProcessed(
     webhookId: string,
-    processedAt: string
+    processedAt: string,
+    processingNote?: string | null
   ): Promise<PaymentWebhookRecord | null> {
     const existing = this.webhooks.get(webhookId);
 
@@ -318,7 +319,7 @@ export class InMemoryPaymentRepository implements PaymentRepository {
       ...existing,
       processedAt,
       processingStatus: "processed",
-      processingError: null
+      processingError: processingNote ?? null
     };
 
     this.webhooks.set(updated.id, updated);
