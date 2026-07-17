@@ -40,6 +40,8 @@ The admin interface (`/admin/payments`) is a Hebrew RTL Power BI-style dashboard
 
 ## Quick start
 
+For the fastest resume in a new session, start with [SESSION_HANDOFF.md](/home/matan/Documents/accountant_nimrodi/SESSION_HANDOFF.md).
+
 ```bash
 npm install
 npm run cf-typegen
